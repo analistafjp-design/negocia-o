@@ -1,0 +1,46 @@
+{
+  "name": "negociacoes-interior",
+  "version": "1.0.0",
+  "private": true,
+  "displayName": "Negociações Interior",
+  "description": "Painel de Negociações do Interior (AnalistaFJP): lê as planilhas de uma pasta no navegador e mostra as negociações por frente de serviço e cluster.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx --yes serve@latest out",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "fixtures": "python3 tools/make_fixtures.py tests/fixtures",
+    "test:core": "node --test tests/core.test.mjs",
+    "test:ui": "node --test tests/ui.test.mjs",
+    "test": "npm run fixtures && npm run test:core && npm run build && npm run test:ui"
+  },
+  "dependencies": {
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "^1.31.0",
+    "next": "16.2.6",
+    "radix-ui": "^1.6.7",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "recharts": "^3.8.0",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "playwright": "^1.56.0",
+    "tailwindcss": "4.2.1",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "5.9.3"
+  }
+}

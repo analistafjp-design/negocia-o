@@ -1,0 +1,102 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* Tons de cinza (grafite): o Painel Executivo é azul-petróleo e o Pós-Corte é azul; este fica neutro. */
+:root {
+  --background: #f2f3f5;
+  --foreground: #1d2126;
+  --card: #ffffff;
+  --card-foreground: #1d2126;
+  --popover: #ffffff;
+  --popover-foreground: #1d2126;
+  --primary: #3d444d;
+  --primary-foreground: #fafafa;
+  --secondary: #eceff2;
+  --secondary-foreground: #1d2126;
+  --muted: #eceff2;
+  --muted-foreground: #6a727d;
+  --accent: #eceff2;
+  --accent-foreground: #1d2126;
+  --destructive: #b4413b;
+  --border: #e3e6ea;
+  --input: #cdd2d9;
+  --ring: #8b93a0;
+  --chart-1: #737b87;
+  --chart-2: #59626f;
+  --chart-3: #3d444d;
+  --chart-4: #a3aab3;
+  --chart-5: #c4cad2;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Segoe UI", Inter, Arial, Helvetica, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Segoe UI", Inter, Arial, Helvetica, sans-serif;
+  min-width: 320px;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: #9aa2ad transparent;
+  scrollbar-width: thin;
+}
+
+[data-slot="card"],
+[data-slot="card-content"],
+[data-slot="card-header"] {
+  min-width: 0;
+}
+
+button {
+  min-width: 0;
+}
+
+.kpi-valor {
+  font-variant-numeric: tabular-nums;
+}
