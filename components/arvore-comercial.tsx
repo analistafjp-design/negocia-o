@@ -11,11 +11,26 @@ interface Props {
   total: Medidas;
   aberto: Record<string, boolean>;
   aoAlternar: (id: string, aberto: boolean) => void;
+  /** Há arquivo de arrecadação: o valor em destaque é o arrecadado, com o negociado pequeno ("de R$ …") embaixo. */
+  temArr: boolean;
 }
 
 const NO = "grid items-center rounded-[10px] border border-marca-linha bg-white";
 const QTD = "text-right font-extrabold tabular-nums";
 const VALOR = "text-right text-muted-foreground tabular-nums";
+
+/** Valor de um nó: o negociado, ou (com arrecadação) o arrecadado em destaque e "de R$ …" negociado embaixo. */
+function Valor({ m, temArr, className }: { m: Medidas; temArr: boolean; className: string }) {
+  if (!temArr) return <span className={className}>{fmtR2(m.valTotal)}</span>;
+  return (
+    <span className={cn(className, "leading-tight")}>
+      <span data-arrecadado className="block font-semibold text-foreground">
+        {fmtR2(m.arrTotal)}
+      </span>{" "}
+      <span className="block text-[11px]">de {fmtR2(m.valTotal)}</span>
+    </span>
+  );
+}
 
 function Alternar({ rotulo, abre, aoClicar }: { rotulo: string; abre: boolean; aoClicar: () => void }) {
   const Icone = abre ? Minus : Plus;
@@ -32,7 +47,7 @@ function Alternar({ rotulo, abre, aoClicar }: { rotulo: string; abre: boolean; a
   );
 }
 
-function Ramo({ no, aberto, aoAlternar }: { no: NoArvore; aberto: Props["aberto"]; aoAlternar: Props["aoAlternar"] }) {
+function Ramo({ no, aberto, aoAlternar, temArr }: { no: NoArvore; aberto: Props["aberto"]; aoAlternar: Props["aoAlternar"]; temArr: boolean }) {
   const abre = no.id in aberto ? aberto[no.id] : no.nivel === 0;
   const temFilhos = no.filhos.length > 0;
   const botao = temFilhos ? <Alternar rotulo={no.rotulo} abre={abre} aoClicar={() => aoAlternar(no.id, !abre)} /> : <span />;
@@ -44,14 +59,23 @@ function Ramo({ no, aberto, aoAlternar }: { no: NoArvore; aberto: Props["aberto"
           <span className="font-extrabold text-marca-escura">{no.rotulo}</span>
           <span className="text-[22px] leading-none font-extrabold text-marca tabular-nums">{fmtQtd(no.m.total)}</span>
           {botao}
-          <span className="col-span-3 -mt-0.5 font-semibold text-tabela-texto tabular-nums">{fmtR2(no.m.valTotal)}</span>
+          {temArr ? (
+            <span className="col-span-3 -mt-0.5 leading-tight tabular-nums">
+              <span data-arrecadado className="block font-bold text-marca-escura">
+                {fmtR2(no.m.arrTotal)}
+              </span>{" "}
+              <span className="block text-xs font-medium text-tabela-texto">de {fmtR2(no.m.valTotal)} negociados</span>
+            </span>
+          ) : (
+            <span className="col-span-3 -mt-0.5 font-semibold text-tabela-texto tabular-nums">{fmtR2(no.m.valTotal)}</span>
+          )}
         </div>
       ) : no.nivel === 1 ? (
         // Frente de serviço
         <div data-nivel={1} data-linha={no.rotulo} className={cn(NO, "grid-cols-[minmax(0,1fr)_2.75rem_6.25rem_1.5rem] gap-x-2.5 py-1.5 pr-2.5 pl-3.5 text-sm xl:w-[360px]")}>
           <span>{no.rotulo}</span>
           <span className={QTD}>{fmtQtd(no.m.total)}</span>
-          <span className={VALOR}>{fmtR2(no.m.valTotal)}</span>
+          <Valor m={no.m} temArr={temArr} className={VALOR} />
           {botao}
         </div>
       ) : (
@@ -59,13 +83,13 @@ function Ramo({ no, aberto, aoAlternar }: { no: NoArvore; aberto: Props["aberto"
         <div data-nivel={no.nivel} data-linha={no.rotulo} className={cn(NO, "grid-cols-[minmax(0,1fr)_2.75rem_6.25rem] gap-x-2.5 px-3.5 py-1.5 text-sm xl:w-[290px]")}>
           <span>{no.rotulo}</span>
           <span className={QTD}>{fmtQtd(no.m.total)}</span>
-          <span className={VALOR}>{fmtR2(no.m.valTotal)}</span>
+          <Valor m={no.m} temArr={temArr} className={VALOR} />
         </div>
       )}
       {temFilhos && abre ? (
         <ul className="arv-kids">
           {no.filhos.map((f) => (
-            <Ramo key={f.id} no={f} aberto={aberto} aoAlternar={aoAlternar} />
+            <Ramo key={f.id} no={f} aberto={aberto} aoAlternar={aoAlternar} temArr={temArr} />
           ))}
         </ul>
       ) : null}
@@ -74,11 +98,17 @@ function Ramo({ no, aberto, aoAlternar }: { no: NoArvore; aberto: Props["aberto"
 }
 
 /** Negociações Comercial em árvore: Total > cluster > frente de serviço > recurso (o "+" abre e o "−" fecha). */
-export function ComercialArvore({ linhas, total, aberto, aoAlternar }: Props) {
+export function ComercialArvore({ linhas, total, aberto, aoAlternar, temArr }: Props) {
   return (
     <div data-arvore="comercial">
       <p className="border-b border-marca-linha bg-tabela px-3.5 py-2 text-xs text-tabela-texto">
         Total › Cluster Perfil › Frente de serviço › Recurso. Use o <strong>+</strong> para abrir e o <strong>−</strong> para fechar; a árvore se ajusta sozinha à largura da tela.
+        {temArr ? (
+          <>
+            {" "}
+            Em destaque, o valor <strong>arrecadado</strong> (parcelas quitadas pagas depois da negociação); “de R$ …” é o valor negociado.
+          </>
+        ) : null}
       </p>
       <div className="p-4 xl:p-6">
         <AjustarALargura>
@@ -89,13 +119,24 @@ export function ComercialArvore({ linhas, total, aberto, aoAlternar }: Props) {
                 <p data-total="neg" className="text-[26px] leading-tight font-extrabold tabular-nums">
                   {fmtQtd(total.total)}
                 </p>
-                <p data-total="valor" className="font-semibold tabular-nums">
-                  {fmtR2(total.valTotal)}
-                </p>
+                {temArr ? (
+                  <>
+                    <p data-total="arrecadado" className="font-bold tabular-nums">
+                      {fmtR2(total.arrTotal)}
+                    </p>
+                    <p className="text-xs font-medium tabular-nums opacity-80">
+                      arrecadado de <span data-total="valor">{fmtR2(total.valTotal)}</span> negociados
+                    </p>
+                  </>
+                ) : (
+                  <p data-total="valor" className="font-semibold tabular-nums">
+                    {fmtR2(total.valTotal)}
+                  </p>
+                )}
               </div>
               <ul className="arv-kids">
                 {linhas.map((no) => (
-                  <Ramo key={no.id} no={no} aberto={aberto} aoAlternar={aoAlternar} />
+                  <Ramo key={no.id} no={no} aberto={aberto} aoAlternar={aoAlternar} temArr={temArr} />
                 ))}
               </ul>
             </li>

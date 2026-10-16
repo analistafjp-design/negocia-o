@@ -2,8 +2,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { VAZIO } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 
-/** Cartão de um indicador: rótulo e valor. O destaque (Total) usa o grafite cheio. */
-export function KpiCard({ id, rotulo, valor, destaque }: { id: string; rotulo: string; valor: string; destaque?: boolean }) {
+/**
+ * Cartão de um indicador: rótulo e valor. O destaque (Total) usa o azul cheio.
+ * `negociado`: com arquivo de arrecadação o valor grande é o arrecadado e o negociado vem pequeno logo abaixo.
+ */
+export function KpiCard({ id, rotulo, valor, destaque, negociado }: { id: string; rotulo: string; valor: string; destaque?: boolean; negociado?: string }) {
   const vazio = valor === VAZIO;
   return (
     <Card
@@ -22,6 +25,11 @@ export function KpiCard({ id, rotulo, valor, destaque }: { id: string; rotulo: s
         >
           {valor}
         </p>
+        {negociado !== undefined ? (
+          <p data-kpi-negociado className={cn("mt-0.5 text-xs font-medium tabular-nums", destaque ? "text-white/75" : "text-muted-foreground")}>
+            arrecadado de {negociado} negociados
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

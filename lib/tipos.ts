@@ -63,7 +63,33 @@ export interface ResultadoIgnorado extends OrigemArquivo {
   tipo: "ignorado";
   motivo: string;
 }
-export type ResultadoArquivo = ResultadoAtividades | ResultadoCluster | ResultadoIgnorado;
+
+/** Um pagamento de parcela quitada do arquivo de arrecadação: [matrícula, data do pagamento aaaa-mm-dd, valor pago, vencimento|nota]. */
+export type PagamentoLido = [mat: string, data: string, val: number, ref: string];
+
+export interface EstatisticasArrecadacao {
+  /** Linhas de dados do CSV (menos o cabeçalho e as vazias). */
+  linhas: number;
+  /** Tipo Fatura "PARCELA" e Situação Pagto "Quitada": as que o painel usa. */
+  parcelasQuitadas: number;
+  outrasFaturas: number;
+  naoQuitadas: number;
+  semMatricula: number;
+  semData: number;
+  valorInvalido: number;
+  /** Primeira e última data de pagamento das parcelas usadas (aaaa-mm-dd). */
+  primeira: string;
+  ultima: string;
+}
+
+/** Arquivo de arrecadação (CSV): só as parcelas quitadas, com o que é preciso para ligá-las às negociações. */
+export interface ResultadoArrecadacao extends OrigemArquivo {
+  tipo: "arrecadacao";
+  pagamentos: PagamentoLido[];
+  stats: EstatisticasArrecadacao;
+  avisos: string[];
+}
+export type ResultadoArquivo = ResultadoAtividades | ResultadoCluster | ResultadoArrecadacao | ResultadoIgnorado;
 
 /** Atividade já ligada às tabelas de apoio (f_Atividade do relatório). */
 export interface Atividade {
@@ -80,6 +106,8 @@ export interface Atividade {
   mot: string; // Motivo não Execução
   val: number | null;
   cl: string; // CLUSTER SALDO ("" = sem cluster)
+  /** Arrecadado real ligado a esta negociação (parcelas pagas depois dela); 0 sem arquivo de arrecadação. */
+  arr: number;
 }
 
 /** Desdobro já ligado às tabelas de apoio (f_Atividade Desdobro do relatório). */
@@ -91,6 +119,8 @@ export interface Desdobro {
   cad: boolean; // código do Cadastro Desdobro
   k: number; // Categoria Principal: 0 outra, 1 corte, 2 pós corte, 3 cobrança
   val: number | null;
+  /** Arrecadado real ligado a este desdobro (só os de negociação, i >= 0); 0 sem arquivo de arrecadação. */
+  arr: number;
 }
 
 export interface Opcoes {
@@ -114,11 +144,33 @@ export interface Resumo {
   semCodigoConhecido: number;
 }
 
+/** O que a ligação entre os pagamentos e as negociações encontrou (valores em milésimos de centavo). */
+export interface ResumoArrecadacao {
+  arquivos: number;
+  /** Linhas de dados lidas dos CSV (todas as faturas). */
+  linhas: number;
+  /** Parcelas quitadas, já sem as repetidas entre arquivos. */
+  pagamentos: number;
+  valor: number;
+  /** Pagamentos que apareciam em mais de um arquivo (diária × acumulada) e contaram uma vez. */
+  repetidos: number;
+  /** Pagamentos ligados a uma negociação da mesma matrícula feita até a data do pagamento. */
+  ligados: number;
+  valorLigado: number;
+  /** Sem negociação da mesma matrícula até a data do pagamento: não entram em nenhum número do painel. */
+  semNegociacao: number;
+  valorSemNegociacao: number;
+  primeira: string;
+  ultima: string;
+}
+
 export interface Modelo {
   A: Atividade[];
   D: Desdobro[];
   opcoes: Opcoes;
   resumo: Resumo;
+  /** null = nenhum arquivo de arrecadação: o painel mostra só o valor negociado. */
+  arrecadacao: ResumoArrecadacao | null;
 }
 
 export interface Filtros {
@@ -141,6 +193,12 @@ export interface Medidas {
   valDesdobro: number | null;
   valPos: number | null;
   valTotal: number | null;
+  /** Arrecadado real das mesmas negociações (mesma conta dos val*; null = sem negociações no contexto). */
+  arrPrincipal: number | null;
+  arrCorte: number | null;
+  arrDesdobro: number | null;
+  arrPos: number | null;
+  arrTotal: number | null;
 }
 
 export interface NoArvore {
@@ -165,6 +223,8 @@ export interface LinhaMotivo {
 }
 
 export interface Visao {
+  /** Há arquivo de arrecadação: o valor em destaque é o arrecadado, e o negociado fica ao lado. */
+  temArr: boolean;
   cards: Medidas;
   comercial: { linhas: NoArvore[]; total: Medidas };
   top10: { linhas: LinhaTop[]; total: Medidas };

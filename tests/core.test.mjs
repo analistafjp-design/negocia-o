@@ -10,6 +10,7 @@ import * as Modelo from '../lib/modelo.ts';
 import * as Medidas from '../lib/medidas.ts';
 import * as Valores from '../lib/valores.ts';
 import * as Fontes from '../lib/fontes.ts';
+import * as Arrecadacao from '../lib/arrecadacao-csv.ts';
 import * as Formato from '../lib/formato.ts';
 import { escalaDoEixo } from '../lib/eixo.ts';
 import { detalhesDaCarga, mensagemDaCarga } from '../lib/mensagens.ts';
@@ -556,4 +557,263 @@ test('gráficos de colunas + linha: valores abreviados em "mil" e eixos com o me
   assert.deepEqual(escalaDoEixo(0, 5, true), { max: 5, ticks: [0, 1, 2, 3, 4, 5] });
   // contagem pequena nunca vira passo fracionário
   assert.ok(escalaDoEixo(1, 5, true).ticks.every(Number.isInteger));
+});
+
+/* ------------------------------------------------------------------ */
+/* Arrecadação real: CSV de pagamentos ligados às negociações           */
+/* ------------------------------------------------------------------ */
+
+/** CSV em memória com a interface mínima de File (o leitor trabalha por blocos de bytes). */
+function csv(texto, codificacao = 'utf-8') {
+  const buf = codificacao === 'utf-8' ? Buffer.from(texto, 'utf-8') : Buffer.from(texto, 'latin1');
+  const b = new Blob([buf]);
+  return { name: 'a.csv', size: buf.length, lastModified: 0, slice: (a, z) => b.slice(a, z) };
+}
+const lerCsv = (p) => Arrecadacao.lerArrecadacao(arquivo(p));
+const CAB_CSV = 'Nº Ligação;Valor Pago;Data Pagto.;Tipo Fatura;Situação Pagto';
+const ARR_ACUMULADA = fx('arrecadacao', 'arrecadacao_acumulada.csv');
+const ARR_DIARIA = fx('arrecadacao', 'arrecadacao_diaria.csv');
+
+test('CSV de arrecadação: só parcelas quitadas; fatura mensal e não quitada só são contadas (Windows-1252, ponto e vírgula)', async () => {
+  const r = await lerCsv(ARR_ACUMULADA);
+  assert.equal(r.tipo, 'arrecadacao');
+  assert.deepEqual(r.stats, { linhas: 7, parcelasQuitadas: 5, outrasFaturas: 1, naoQuitadas: 1, semMatricula: 0, semData: 0, valorInvalido: 0, primeira: '2026-09-28', ultima: '2026-10-05' });
+  assert.deepEqual(r.pagamentos.map((p) => [p[0], p[1], R(p[2])]), [
+    ['100001', '2026-09-29', 100],
+    ['100001', '2026-10-05', 150],
+    ['100001', '2026-09-28', 999],
+    ['100064', '2026-09-30', 1234.56], // "1.234,56"
+    ['8888801', '2026-09-30', 500],
+  ]);
+  assert.equal(r.pagamentos[0][3], '10/10/2026|0', 'vencimento e nota identificam a parcela');
+  assert.deepEqual(r.avisos, []);
+});
+
+test('CSV de arrecadação: UTF-8 com BOM e quebra de linha só com \\n', async () => {
+  const r = await lerCsv(ARR_DIARIA);
+  assert.equal(r.stats.parcelasQuitadas, 5);
+  assert.deepEqual(r.pagamentos.map((p) => p[0]), ['100001', '100001', '100001', '100002', '100002']);
+});
+
+test('CSV de arrecadação: separador vírgula, aspas (com vírgula e aspas dentro), colunas em outra ordem e datas ISO ou BR', async () => {
+  const r = await lerCsv(fx('casos', 'arrecadacao_virgula_aspas.csv'));
+  assert.deepEqual(r.pagamentos.map((p) => [p[0], p[1], R(p[2])]), [['555001', '2026-10-02', 1234.56], ['555002', '2026-10-02', 100]], '"0555002" vira 555002; "R$ 100,00" vale 100');
+  assert.equal(r.stats.outrasFaturas, 1);
+});
+
+test('CSV de arrecadação: campo entre aspas com quebra de linha, linhas em branco e só separadores', async () => {
+  const texto = [CAB_CSV + ';Cliente', '10;50,00;01/10/2026;3-PARCELA;Quitada;"NOME\nEM DUAS LINHAS"', '', ';;;;;', '11;60,00;02/10/2026;3-PARCELA;Quitada;X', ''].join('\r\n');
+  const r = await Arrecadacao.lerArrecadacao(csv(texto));
+  assert.deepEqual(r.pagamentos.map((p) => p[0]), ['10', '11']);
+  assert.equal(r.stats.linhas, 2, 'linha em branco e só separadores não contam');
+});
+
+test('CSV de arrecadação: linhas com data, valor ou matrícula ilegíveis ficam de fora e viram aviso', async () => {
+  const texto = [CAB_CSV, '10;50,00;01/10/2026;3-PARCELA;Quitada', '11;abc;02/10/2026;3-PARCELA;Quitada', '12;70,00;31/02/2026;3-PARCELA;Quitada', ';80,00;02/10/2026;3-PARCELA;Quitada'].join('\n');
+  const r = await Arrecadacao.lerArrecadacao(csv(texto));
+  assert.equal(r.pagamentos.length, 1);
+  assert.deepEqual([r.stats.valorInvalido, r.stats.semData, r.stats.semMatricula], [1, 1, 1]);
+  assert.equal(r.avisos.length, 3);
+});
+
+test('CSV de arrecadação: recusa o que não é arrecadação, dizendo o que falta', async () => {
+  await assert.rejects(lerCsv(fx('casos', 'arrecadacao_sem_valor.csv')), (e) => e instanceof N.NegError && e.code === 'COLUNAS_AUSENTES' && /Valor Pago/.test(e.message));
+  await assert.rejects(lerCsv(fx('casos', 'arrecadacao_outro_assunto.csv')), (e) => e instanceof N.NegError && e.code === 'SEM_CABECALHO');
+  await assert.rejects(Arrecadacao.lerArrecadacao(csv('')), (e) => e instanceof N.NegError && e.code === 'EMPTY');
+});
+
+test('CSV de arrecadação: reconhece a codificação pelos bytes (UTF-8, UTF-8 com BOM, UTF-16 ou Windows-1252)', () => {
+  const b = (...v) => new Uint8Array(v);
+  assert.equal(Arrecadacao.codificacaoDe(Buffer.from('Nº Ligação', 'utf-8')), 'utf-8');
+  assert.equal(Arrecadacao.codificacaoDe(b(0xef, 0xbb, 0xbf, 0x4e)), 'utf-8');
+  assert.equal(Arrecadacao.codificacaoDe(Buffer.from('Nº Ligação', 'latin1')), 'windows-1252');
+  assert.equal(Arrecadacao.codificacaoDe(b(0xff, 0xfe, 0x4e, 0x00)), 'utf-16le');
+  assert.equal(Arrecadacao.codificacaoDe(b(0x41, 0x42)), 'utf-8', 'só ASCII serve para os dois');
+});
+
+const pag = (mat, data, reais_, ref = '|') => [mat, data, fixo(reais_), ref];
+/** Arquivo de arrecadação já lido, para montar o modelo sem passar pelo CSV. */
+const arrecadacao = (pagamentos, nome = 'Arrecadação diária.csv') => ({
+  tipo: 'arrecadacao',
+  path: nome,
+  name: nome,
+  pagamentos,
+  stats: { linhas: pagamentos.length, parcelasQuitadas: pagamentos.length, outrasFaturas: 0, naoQuitadas: 0, semMatricula: 0, semData: 0, valorInvalido: 0, primeira: '', ultima: '' },
+  avisos: [],
+});
+const modeloArr = (atividades, desdobros, pagamentos, extras = []) =>
+  N.consolidar([
+    { tipo: 'atividades', path: 'a.xlsx', atividades, desdobros },
+    { tipo: 'cluster', path: 'Cluster_a.xlsx', pares: [] },
+    arrecadacao(pagamentos),
+    ...extras,
+  ]);
+const arrTotal = (m, f = {}) => R(N.calcular(m, f).cards.arrTotal);
+
+test('arrecadado: pagamento no dia da negociação ou depois conta; antes dela não conta e só aparece no resumo', () => {
+  const m = modeloArr([atv({ mat: '1', data: '2026-09-10' })], [], [pag('1', '2026-09-09', 40), pag('1', '2026-09-10', 10), pag('1', '2026-10-30', 5)]);
+  assert.equal(arrTotal(m), 15);
+  assert.equal(R(m.arrecadacao.valorLigado), 15);
+  assert.equal(R(m.arrecadacao.valorSemNegociacao), 40);
+  assert.deepEqual([m.arrecadacao.pagamentos, m.arrecadacao.ligados, m.arrecadacao.semNegociacao], [3, 2, 1]);
+  assert.equal(R(N.calcular(m).cards.valTotal), 100, 'o valor negociado continua o mesmo');
+});
+
+test('arrecadado: só a matrícula da negociação; pagamento de outra matrícula e atividade sem negociação não contam', () => {
+  const m = modeloArr(
+    [atv({ mat: '1' }), atv({ mat: '2', neg: 'NÃO' }), atv({ mat: '3', codigo: '209001 - CORTE DE ÁGUA NO CAVALETE - DÉBITO' })],
+    [],
+    [pag('1', '2026-10-01', 7), pag('2', '2026-10-01', 11), pag('3', '2026-10-01', 13), pag('9', '2026-10-01', 17)]
+  );
+  assert.equal(arrTotal(m), 7);
+  assert.equal(R(m.arrecadacao.valorSemNegociacao), 41);
+});
+
+test('arrecadado: com mais de uma negociação vale a mais recente até a data do pagamento', () => {
+  const m = modeloArr(
+    [atv({ mat: '1', data: '2026-09-01' }), atv({ mat: '1', data: '2026-09-20' })],
+    [],
+    [pag('1', '2026-09-10', 10), pag('1', '2026-09-25', 100), pag('1', '2026-09-25', 1, '|2')]
+  );
+  assert.equal(arrTotal(m, { data: '2026-09-01' }), 10, 'o pagamento de 10/09 é da primeira negociação');
+  assert.equal(arrTotal(m, { data: '2026-09-20' }), 101, 'os de 25/09 são da segunda');
+  assert.equal(arrTotal(m), 111, 'cada pagamento conta uma vez no total');
+});
+
+test('arrecadado: negociações do mesmo dia (principal e desdobro) dividem o pagamento pelo valor negociado', () => {
+  const m = modeloArr([atv({ mat: '1', val: fixo(100) })], [dsd({ mat: '1', val: fixo(300) })], [pag('1', '2026-10-01', 200)]);
+  const c = N.calcular(m).cards;
+  assert.equal(R(c.arrPrincipal), 50);
+  assert.equal(R(c.arrPos), 150, 'o desdobro é de pós corte (vistoria)');
+  assert.equal(R(c.arrTotal), 200);
+  assert.equal(c.arrCorte, null, 'sem desdobro de corte: BLANK');
+  assert.equal(R(c.arrDesdobro), 0);
+  // sem valor negociado em nenhuma, o pagamento se divide em partes iguais
+  const sem = modeloArr([atv({ mat: '1', val: null })], [dsd({ mat: '1', val: null })], [pag('1', '2026-10-01', 200)]);
+  assert.equal(R(N.calcular(sem).cards.arrPrincipal), 100);
+  assert.equal(R(N.calcular(sem).cards.arrPos), 100);
+});
+
+test('arrecadado: a divisão do pagamento não perde nem cria um milésimo de centavo', () => {
+  const m = modeloArr([atv({ mat: '1', val: fixo(33.33) })], [dsd({ mat: '1', val: fixo(33.34) }), dsd({ mat: '1', val: fixo(33.33) })], [pag('1', '2026-10-01', 100.01), pag('1', '2026-10-02', 0.01)]);
+  assert.equal(N.calcular(m).cards.arrTotal, fixo(100.02));
+});
+
+test('arrecadado: o filtro de mês ou de data é o da negociação, não o do pagamento', () => {
+  const m = modeloArr([atv({ mat: '1', data: '2026-09-29' })], [], [pag('1', '2026-09-30', 10), pag('1', '2026-10-15', 20)]);
+  assert.equal(arrTotal(m, { mes: '2026-09' }), 30, 'pago em outubro, mas negociado em setembro');
+  assert.equal(arrTotal(m, { mes: '2026-10' }), null, 'sem negociação em outubro: BLANK');
+});
+
+test('arrecadado: negociação com pagamentos zerados mostra zero; sem negociação no contexto fica BLANK', () => {
+  const m = modeloArr([atv({ mat: '1' }), atv({ mat: '2', cidade: 'ITAOCARA' })], [], [pag('1', '2026-10-01', 5)]);
+  const por = Object.fromEntries(N.calcular(m).cidades.linhas.map((l) => [l.rotulo, R(l.m.arrTotal)]));
+  assert.deepEqual(por, { MIRACEMA: 5, ITAOCARA: 0 });
+  assert.equal(N.calcular(m, { frente: 'Inexistente' }).cards.arrTotal, null);
+});
+
+test('arrecadado: o mesmo pagamento em dois arquivos conta uma vez; o repetido dentro de um arquivo vale cada um', () => {
+  const iguais = pag('1', '2026-10-01', 10, '10/10/2026|0');
+  const m = modeloArr([atv({ mat: '1' })], [], [iguais], [arrecadacao([iguais, pag('1', '2026-10-02', 3), pag('1', '2026-10-02', 3)], 'Acumulada/jan.csv')]);
+  assert.equal(arrTotal(m), 16, '10 (uma vez) + 3 + 3 (duas parcelas iguais no mesmo arquivo)');
+  assert.deepEqual([m.arrecadacao.pagamentos, m.arrecadacao.repetidos, m.arrecadacao.arquivos], [3, 1, 2]);
+  // outra parcela do mesmo valor no mesmo dia (outro vencimento) é outro pagamento
+  const outra = modeloArr([atv({ mat: '1' })], [], [pag('1', '2026-10-01', 10, '10/10/2026|0')], [arrecadacao([pag('1', '2026-10-01', 10, '10/11/2026|0')], 'b.csv')]);
+  assert.equal(arrTotal(outra), 20);
+});
+
+test('sem arquivo de arrecadação: o painel mostra só o valor negociado', () => {
+  const m = modelo([atv({ mat: '1' })]);
+  assert.equal(m.arrecadacao, null);
+  assert.equal(N.calcular(m).temArr, false);
+  assert.equal(N.calcular(modeloArr([atv({ mat: '1' })], [], [])).temArr, true, 'com arquivo, ainda que sem parcelas, é arrecadação zero');
+});
+
+test('Negociação x Cidade: com arrecadação a lista segue o arrecadado, não o negociado', () => {
+  const m = modeloArr(
+    [atv({ mat: '1', cidade: 'ITAOCARA', val: fixo(1000) }), atv({ mat: '2', cidade: 'MIRACEMA', val: fixo(10) })],
+    [],
+    [pag('1', '2026-10-01', 1), pag('2', '2026-10-01', 9)]
+  );
+  assert.deepEqual(N.calcular(m).cidades.linhas.map((l) => l.rotulo), ['MIRACEMA', 'ITAOCARA']);
+  assert.deepEqual(N.calcular(modelo([atv({ mat: '1', cidade: 'ITAOCARA', val: fixo(1000) }), atv({ mat: '2', cidade: 'MIRACEMA', val: fixo(10) })])).cidades.linhas.map((l) => l.rotulo), ['ITAOCARA', 'MIRACEMA']);
+});
+
+test('arrecadação do print: pagamentos das planilhas sintéticas ligados às negociações de 29/09/2026', async () => {
+  const resultados = [];
+  for (const n of fs.readdirSync(fx('print')).sort()) resultados.push(await ler(fx('print', n)));
+  for (const p of [ARR_ACUMULADA, ARR_DIARIA]) resultados.push(Object.assign(await lerCsv(p), { path: path.basename(p), name: path.basename(p) }));
+  const m = N.consolidar(resultados);
+  const a = m.arrecadacao;
+  assert.deepEqual([a.arquivos, a.linhas, a.pagamentos, a.repetidos, a.ligados, a.semNegociacao], [2, 12, 8, 2, 6, 2]);
+  assert.equal(R(a.valor), 3073.56);
+  assert.equal(R(a.valorLigado), 1574.56, '100 + 150 + 50 da 100001, 40 da 100002 e 1.234,56 da 100064');
+  assert.equal(R(a.valorSemNegociacao), 1499, '999 pagos antes da negociação e 500 de matrícula sem negociação');
+  assert.deepEqual([a.primeira, a.ultima], ['2026-09-28', '2026-10-06']);
+  const v = N.calcular(m, DIA);
+  assert.equal(v.temArr, true);
+  const c = v.cards;
+  assert.equal(R(c.valTotal), 58427.47, 'o negociado não mudou');
+  assert.deepEqual([R(c.arrPrincipal), c.arrCorte, R(c.arrDesdobro), R(c.arrPos), R(c.arrTotal)], [183.25, null, 0, 1391.31, 1574.56]);
+  assert.equal(R(c.arrPrincipal + c.arrPos), 1574.56);
+  // a árvore: tudo isso está em Inadimplente (Leitura: 100001 e 100002; Corte e Religa: 100064); Adimplente tem negociação e zero arrecadado
+  const nos = Object.fromEntries(v.comercial.linhas.map((n) => [n.rotulo, n]));
+  assert.equal(R(nos.Inadimplente.m.arrTotal), 1574.56);
+  assert.equal(R(nos.Adimplente.m.arrTotal), 0);
+  const frente = (n, f) => R(n.filhos.find((x) => x.rotulo === f).m.arrTotal);
+  assert.deepEqual([frente(nos.Inadimplente, 'Leitura'), frente(nos.Inadimplente, 'Corte e Religa'), frente(nos.Inadimplente, 'Pós Corte')], [340, 1234.56, 0]);
+  assert.equal(R(v.comercial.total.arrTotal), 1574.56);
+  // Negociação x Cidade traz o mesmo total dos cartões
+  assert.equal(R(v.cidades.total.arrTotal), 1574.56);
+});
+
+test('pasta: .csv só é lido quando "Arrecadação" está no nome do arquivo ou de uma pasta do caminho', async () => {
+  const abertos = [];
+  const entradas = [
+    entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades-INTERIOR_29_09_26.xlsx', abertos),
+    entradaDe(fx('print', 'Cluster_2026-09.xlsx'), 'Cluster_2026-09.xlsx', abertos),
+    entradaDe(ARR_ACUMULADA, 'jan-set.csv', abertos, 'Arrecadação/Arrecadação acumulada/jan-set.csv'), // pela pasta
+    entradaDe(ARR_DIARIA, 'Arrecadação diária.csv', abertos), // pelo nome
+    entradaDe(ARR_DIARIA, 'Outro assunto.csv', abertos), // nem é aberto
+    entradaDe(ARR_DIARIA, '~$Arrecadação diária.csv', abertos), // temporário do Excel
+  ];
+  const rel = await Fontes.carregarArquivos(entradas, opcoesPasta());
+  assert.deepEqual(abertos.filter((n) => /csv$/.test(n)).sort(), ['Arrecadação diária.csv', 'jan-set.csv']);
+  assert.equal(rel.arrecadacoes.length, 2);
+  assert.equal(rel.modelo.arrecadacao.arquivos, 2);
+  assert.deepEqual(rel.ignoradosPorNome, [], 'os .csv de fora não entram na lista dos ignorados');
+  // a pasta conectada pode ser a própria "Arrecadação": o nome dela conta como parte do caminho
+  const dentro = await Fontes.carregarArquivos([entradaDe(ARR_DIARIA, '2026-10.csv', []), entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades.xlsx', [])], opcoesPasta({ raiz: 'Arrecadação' }));
+  assert.equal(dentro.arrecadacoes.length, 1);
+  const fora = await Fontes.carregarArquivos([entradaDe(ARR_DIARIA, '2026-10.csv', []), entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades.xlsx', [])], opcoesPasta({ raiz: 'Interior' }));
+  assert.equal(fora.arrecadacoes.length, 0);
+  // arquivos escolhidos à mão: lê qualquer .csv, pelas colunas
+  const mao = await Fontes.carregarArquivos([entradaDe(ARR_DIARIA, 'qualquer.csv', []), entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades.xlsx', [])], opcoesPasta({ soPorNome: false }));
+  assert.equal(mao.arrecadacoes.length, 1);
+});
+
+test('mensagens: o resumo da arrecadação fica nos detalhes; só CSV que não é de arrecadação pede ação na tela', async () => {
+  const base = [
+    entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades-INTERIOR_29_09_26.xlsx', []),
+    entradaDe(fx('print', 'Cluster_2026-09.xlsx'), 'Cluster_2026-09.xlsx', []),
+  ];
+  const sem = await Fontes.carregarArquivos(base, opcoesPasta());
+  assert.equal(mensagemDaCarga(sem, { auto: false, fonte: 'Interior', temModeloAnterior: false }), null, 'sem arrecadação não há aviso na tela');
+  assert.ok(detalhesDaCarga(sem, { auto: false }).itens.some((t) => /Nenhum arquivo de arrecadação/.test(t)));
+
+  const com = await Fontes.carregarArquivos([...base, entradaDe(ARR_ACUMULADA, 'Arrecadação acumulada.csv', []), entradaDe(ARR_DIARIA, 'Arrecadação diária.csv', [])], opcoesPasta());
+  assert.equal(mensagemDaCarga(com, { auto: false, fonte: 'Interior', temModeloAnterior: false }), null);
+  const det = detalhesDaCarga(com, { auto: false });
+  assert.match(det.detalhe, /Arrecadação: 2 arquivos/);
+  const nota = det.itens.find((t) => /^Arrecadação: 8 pagamentos/.test(t));
+  assert.ok(nota, 'resumo da arrecadação');
+  assert.match(nota, /R\$\s3\.073,56/);
+  assert.match(nota, /Ligados a negociações da mesma matrícula: 6 \(R\$\s1\.574,56\)/);
+  assert.match(nota, /Sem negociação da mesma matrícula até a data do pagamento \(não entram em nenhum número\): 2 \(R\$\s1\.499,00\)/);
+  assert.ok(det.itens.some((t) => /^2 pagamentos apareciam em mais de um arquivo/.test(t)));
+
+  const ruim = await Fontes.carregarArquivos([...base, entradaDe(fx('casos', 'arrecadacao_outro_assunto.csv'), 'Arrecadação outra coisa.csv', [])], opcoesPasta());
+  const msg = mensagemDaCarga(ruim, { auto: false, fonte: 'Interior', temModeloAnterior: false });
+  assert.equal(msg.kind, 'warning');
+  assert.deepEqual(msg.items, ['Ignorado (não é de atividades, Cluster nem arrecadação): Arrecadação outra coisa.csv']);
 });

@@ -13,7 +13,7 @@ Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho az
 | --- | --- |
 | Filtros | Frente de serviço, Cluster, Mês/ano e Data (abre no mês mais recente) |
 | Cartões de quantidade | Negociação Principal · Cadastro Desdobro · Negociação Corte · Negociação Desdobro · Negociação Pós Corte · **Total Negociações** |
-| Cartões de valor | Negociação Principal $ · $ Desdobro Corte · $ Desdobro · $ Desdobro Pós Corte · **Negociação Tot $** |
+| Cartões de valor | Negociação Principal $ · $ Desdobro Corte · $ Desdobro · $ Desdobro Pós Corte · **Negociação Tot $** (com os arquivos de arrecadação, o valor grande é o **arrecadado** e o negociado fica pequeno abaixo; veja "Arrecadação real") |
 | Negociações Comercial | Árvore Total › Cluster Perfil › frente de serviço › recurso (o + abre e o − fecha); abre para o lado em tela larga e empilha no celular |
 | Top 10 Negociações | Gráfico de colunas (quantidade) e linha (valor), por recurso, na ordem do ranking |
 | Negociação x Cidade | Gráfico de colunas (valor) e linha (quantidade), por cidade |
@@ -31,11 +31,14 @@ Os quatro painéis de baixo ocupam a largura toda, um embaixo do outro, nessa or
      `Data`, `Negociou O Débito?`, `Valor Total dos Débitos` e `Body Adicional Executado`
      (opcionais: `ID da Atividade`, `Cidade`, `Motivo de Não Execução - Cobrança/Normal`);
    - o arquivo **Cluster_** (aba `Planilha1`), com `NUM_LIGACAO` e `CLUSTER SALDO`.
+   - os `.csv` de **arrecadação** (`Arrecadação diária`, `Arrecadação acumulada`), para trazer o valor arrecadado real
+     (opcional; veja "Arrecadação real").
    Na pasta, **só são lidos os `.xlsx` com "Atividade" ou "Cluster" no nome** (como no Power BI), inclusive nas
    subpastas; os demais (por exemplo `Termos de Janeiro a Agosto.xlsx`) são ignorados sem nem serem abertos e
-   aparecem no resumo da leitura. Dentro de cada arquivo, a aba é reconhecida pelas colunas.
+   aparecem no resumo da leitura. Dentro de cada arquivo, a aba é reconhecida pelas colunas. Os `.csv` só são
+   lidos quando "Arrecadação" aparece no nome do arquivo ou de uma pasta do caminho.
 3. Nas próximas vezes ele lembra da pasta, relê só o que mudou e confere a pasta sozinho a cada 60 s.
-4. Outro navegador? Use **Importar Excel** e escolha os arquivos (sem acompanhamento automático); aí vale o que
+4. Outro navegador? Use **Importar arquivos** e escolha os arquivos (`.xlsx` e `.csv`) (sem acompanhamento automático); aí vale o que
    você escolheu, qualquer que seja o nome.
 
 O resumo da leitura (arquivos lidos, ignorados, observações do Power BI) fica recolhido em **Detalhes da leitura**, no
@@ -68,9 +71,37 @@ As medidas foram portadas do relatório `Report Negociações Acumulado` (`lib/m
 - As tabelas de códigos e de recursos vêm do próprio relatório: `python3 tools/gerar_tabelas.py <extração.md>`
   regenera `lib/tabelas.ts`.
 
+## Arrecadação real
+
+Os valores em R$ do relatório são **negociados** (`Valor Total dos Débitos`, o que o cliente devia). Com os `.csv` de
+arrecadação na pasta (`lib/arrecadacao-csv.ts`, `lib/arrecadacao.ts`) o painel traz o **valor arrecadado real** das
+negociações executadas e o mostra **em destaque**, com o negociado pequeno ao lado ("arrecadado de R$ … negociados";
+na árvore, "de R$ …"), nos cartões de valor, na árvore, no Top 10 (a linha vira o arrecadado) e em Negociação x Cidade
+(as colunas viram o arrecadado e a lista segue ele). Sem arquivo de arrecadação, a tela é a de sempre.
+
+- **Colunas** (achadas pelo nome): `Nº Ligação`, `Valor Pago`, `Data Pagto.`, `Tipo Fatura` e `Situação Pagto`
+  (opcionais, só para reconhecer o pagamento: `Vencimento` e `Nº Nota`). Separador `;`, `,`, tab ou `|`, UTF-8 ou
+  Windows-1252, reconhecidos pelo próprio arquivo.
+- **Regra** (pedido do usuário, 16/10/2026): só **parcelas** (`Tipo Fatura` "3-PARCELA") **quitadas** (`Situação Pagto`
+  "Quitada"); o pagamento conta para uma negociação da **mesma matrícula** feita **até a data do pagamento** (no dia da
+  negociação ou depois); **cada pagamento conta uma vez**. As notas fiscais mensais não contam.
+- **Mais de uma negociação** da mesma matrícula: vale a mais recente até a data do pagamento. Negociações do mesmo dia
+  (a principal e os desdobros) dividem o pagamento na proporção do valor negociado de cada uma (partes iguais se nenhuma
+  tem valor); a divisão é exata, sem perder nem criar centavo.
+- **Pagamento sem negociação anterior** da matrícula (ou de matrícula que nunca negociou) não entra em nenhum número;
+  aparece só no resumo, em "Detalhes da leitura".
+- **Diária × acumulada**: o mesmo pagamento (matrícula, data, valor, vencimento e nota) em mais de um arquivo conta
+  uma vez; a repetição dentro de um único arquivo são pagamentos diferentes e valem cada um.
+- **Os filtros** (Mês/ano e Data) são os da **negociação**, não os do pagamento: "set/2026" mostra o que as negociações de
+  setembro já arrecadaram, mesmo pago em outubro. O arrecadado segue o mesmo recorte do negociado (as mesmas linhas, a
+  mesma amarração do desdobro por matrícula).
+- Negociação sem pagamento mostra `R$ 0`; sem negociação no recorte, `—`.
+- Cuidado: toda parcela quitada da mesma matrícula depois da negociação conta, mesmo que seja de outro parcelamento
+  (a planilha de arrecadação não diz de qual negociação é a parcela).
+
 ### Pontos para conferir com a base real
 
-Estes dois vieram da leitura da extração e do print, sem dados reais para confirmar:
+Estes vieram da leitura da extração e do print, sem dados reais para confirmar:
 
 1. **Desdobro × matrícula.** No Power BI o desdobro se liga às atividades pela matrícula (muitos-para-muitos).
    Aqui ele só é amarrado à matrícula quando há filtro de atividade (frente, cluster, linha de tabela); só com
@@ -78,6 +109,8 @@ Estes dois vieram da leitura da extração e do print, sem dados reais para conf
    de cidades, e **131** na soma das cidades e na matriz Comercial (um desdobro sem atividade da mesma matrícula).
 2. **Coluna "Top".** Com os números do print, a fórmula do ranking documentada daria outra ordem em
    `RIOLTRIN-009`/`-023`. O painel segue a fórmula documentada e, desde 16/10/2026, desempata os iguais (acima).
+3. **Arrecadação.** A ligação pagamento × negociação (acima) foi pedida e testada só com CSV sintéticos; falta conferir
+   com a base real se a soma bate com o que a cobrança enxerga, principalmente a escolha da negociação mais recente.
 
 ## Desenvolvimento
 
@@ -91,7 +124,9 @@ npm test             # planilhas sintéticas + núcleo (Node) + build + interfac
 - Node 22.18+ (os testes do núcleo importam os `.ts` de `lib/` direto).
 - Testes de interface: `npx playwright install chromium` (ou `CHROMIUM_PATH=/caminho/do/chromium`).
 - `tools/make_fixtures.py` (precisa de `xlsxwriter`) gera planilhas **sintéticas** em `tests/fixtures/`. A pasta
-  `print/` monta um conjunto que, lido pelo painel, reproduz os cartões e a matriz Cluster × Frente do print.
+  `print/` monta um conjunto que, lido pelo painel, reproduz os cartões e a matriz Cluster × Frente do print; a pasta
+  `arrecadacao/` traz CSV sintéticos (Windows-1252 e UTF-8 com BOM) ligados às matrículas do print. Os nomes dos
+  arquivos de teste não têm acento (o Chromium sem locale UTF-8 não anexa arquivo com acento no nome).
 
 ```
 app/                 página (negociacoes-client.tsx) e tema
@@ -99,6 +134,8 @@ components/          cartões, painéis, tabelas, gráfico e shadcn/ui
 lib/
   xlsx-reader.ts     leitor de .xlsx por streaming (ZIP + XML), sem bibliotecas
   leitura.ts         reconhece e lê atividades e Cluster
+  arrecadacao-csv.ts leitor dos CSV de arrecadação (só parcelas quitadas)
+  arrecadacao.ts     liga os pagamentos às negociações da mesma matrícula
   modelo.ts          junta arquivos e liga as tabelas (como o modelo do Power BI)
   medidas.ts         medidas do relatório e os visuais
   eixo.ts            escala dos eixos dos gráficos de colunas + linha

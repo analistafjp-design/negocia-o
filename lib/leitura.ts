@@ -72,7 +72,7 @@ function acharCampos(n: number, cols: number[], vals: string[], mapa: Map<string
 }
 
 /** Valor em milésimos de centavo (4 casas, como o Currency.Type do Power BI): a soma fica exata. */
-const paraFixo = (v: number): number => Math.round(v * 10000);
+export const paraFixo = (v: number): number => Math.round(v * 10000);
 
 /** Matrícula como texto de dígitos: 12345.0, 012345 e 12345 são a mesma (no Power BI é número inteiro). */
 export function matriculaTexto(v: unknown): string {

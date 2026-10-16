@@ -13,8 +13,8 @@ interface Ponto {
   rotulo: string;
   col: number | null;
   lin: number | null;
-  /** Textos exatos para o balão. */
-  dica: { titulo: string; col: string; lin: string };
+  /** Textos exatos para o balão: o título e os pares nome/valor. */
+  dica: { titulo: string; linhas: Array<[string, string]> };
   /** Células da linha da tabela escondida (leitor de tela): o mesmo que a tabela do relatório mostra. */
   celulas: Array<string | number>;
 }
@@ -39,6 +39,8 @@ interface Props {
   /** Inclinação (graus) dos nomes do eixo X. */
   angulo: number;
   total: Medidas;
+  /** Há arquivo de arrecadação: o Total mostra o arrecadado em destaque e o negociado ao lado. */
+  temArr: boolean;
 }
 
 type Ctx = { x?: number | string; y?: number | string; value?: unknown };
@@ -54,23 +56,22 @@ function TickInclinado({ x, y, payload, angulo }: { x?: number | string; y?: num
   );
 }
 
-function Dica({ active, payload, nomeCol, nomeLin }: { active?: boolean; payload?: ReadonlyArray<{ payload?: Ponto }>; nomeCol: string; nomeLin: string }) {
+function Dica({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ payload?: Ponto }> }) {
   const p = payload?.[0]?.payload;
   if (!active || !p) return null;
   return (
     <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="mb-1 font-bold">{p.dica.titulo}</p>
-      <p>
-        {nomeCol}: <strong>{p.dica.col}</strong>
-      </p>
-      <p>
-        {nomeLin}: <strong>{p.dica.lin}</strong>
-      </p>
+      {p.dica.linhas.map(([nome, valor]) => (
+        <p key={nome}>
+          {nome}: <strong>{valor}</strong>
+        </p>
+      ))}
     </div>
   );
 }
 
-function ColunasLinha({ id, pontos, nomeCol, nomeLin, fmtCol, fmtLin, colInteira, linInteira, cores, rotuloDentro, angulo, total }: Props) {
+function ColunasLinha({ id, pontos, nomeCol, nomeLin, fmtCol, fmtLin, colInteira, linInteira, cores, rotuloDentro, angulo, total, temArr }: Props) {
   const maxCol = Math.max(0, ...pontos.map((p) => p.col ?? 0));
   const maxLin = Math.max(0, ...pontos.map((p) => p.lin ?? 0));
   const ec = escalaDoEixo(maxCol, 5, colInteira);
@@ -119,7 +120,7 @@ function ColunasLinha({ id, pontos, nomeCol, nomeLin, fmtCol, fmtLin, colInteira
             <XAxis dataKey="rotulo" interval={0} height={alturaEixo} tickLine={false} axisLine={{ stroke: "var(--marca-linha)" }} tick={(p: Ctx & { payload?: { value?: unknown } }) => <TickInclinado x={p.x} y={p.y} payload={p.payload} angulo={angulo} />} />
             <YAxis yAxisId="col" orientation="left" width={52} domain={[0, ec.max]} ticks={ec.ticks} tickFormatter={fmtMil} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
             <YAxis yAxisId="lin" orientation="right" width={58} domain={[0, el.max]} ticks={el.ticks} tickFormatter={fmtMil} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-            <Tooltip cursor={{ fill: "var(--marca-suave)", opacity: 0.6 }} content={(p) => <Dica active={p.active} payload={p.payload as ReadonlyArray<{ payload?: Ponto }>} nomeCol={nomeCol} nomeLin={nomeLin} />} />
+            <Tooltip cursor={{ fill: "var(--marca-suave)", opacity: 0.6 }} content={(p) => <Dica active={p.active} payload={p.payload as ReadonlyArray<{ payload?: Ponto }>} />} />
             <Bar yAxisId="col" dataKey="col" fill={cores.col} radius={[3, 3, 0, 0]} maxBarSize={56} isAnimationActive={false}>
               <LabelList
                 dataKey="col"
@@ -148,41 +149,57 @@ function ColunasLinha({ id, pontos, nomeCol, nomeLin, fmtCol, fmtLin, colInteira
         <span>
           <span data-total="neg">{fmtQtd(total.total)}</span>
           <span className="mx-2 font-normal text-tabela-texto">·</span>
-          <span data-total="valor">{fmtR2(total.valTotal)}</span>
+          {temArr ? (
+            <>
+              <span data-total="arrecadado">{fmtR2(total.arrTotal)}</span>
+              <span className="ml-2 font-normal text-tabela-texto">
+                arrecadado de <span data-total="valor">{fmtR2(total.valTotal)}</span> negociados
+              </span>
+            </>
+          ) : (
+            <span data-total="valor">{fmtR2(total.valTotal)}</span>
+          )}
         </span>
       </p>
-      {/* os mesmos números, em tabela, para leitor de tela */}
-      <table className="sr-only">
-        <caption>{nomeCol} e {nomeLin}</caption>
-        <tbody>
-          {pontos.map((p) => (
-            <tr key={p.rotulo} data-linha={p.rotulo}>
-              {p.celulas.map((c, i) => (
-                <td key={i}>{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* os mesmos números, em tabela, para leitor de tela; a tabela fica dentro de uma div sr-only porque tabela ignora a largura de 1px e alargaria a página */}
+      <div className="sr-only">
+        <table>
+          <caption>{nomeCol} e {nomeLin}</caption>
+          <tbody>
+            {pontos.map((p) => (
+              <tr key={p.rotulo} data-linha={p.rotulo}>
+                {p.celulas.map((c, i) => (
+                  <td key={i}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-/** Top 10 Negociações: colunas = quantidade, linha = valor (R$). */
-export function TopGrafico({ linhas, total }: { linhas: LinhaTop[]; total: Medidas }) {
+const R_ARR = "valor arrecadado (R$)";
+
+/** Top 10 Negociações: colunas = quantidade, linha = valor (R$): o arrecadado, quando há arquivo de arrecadação. */
+export function TopGrafico({ linhas, total, temArr }: { linhas: LinhaTop[]; total: Medidas; temArr: boolean }) {
   const pontos: Ponto[] = linhas.map((l) => ({
     rotulo: l.rotulo,
     col: l.m.total,
-    lin: reais(l.m.valTotal),
-    dica: { titulo: `Top ${l.top} · ${l.rotulo}`, col: fmtQtd(l.m.total), lin: fmtR2(l.m.valTotal) },
-    celulas: [l.rotulo, l.top, fmtQtd(l.m.total), fmtR2(l.m.valTotal)],
+    lin: reais(temArr ? l.m.arrTotal : l.m.valTotal),
+    dica: {
+      titulo: `Top ${l.top} · ${l.rotulo}`,
+      linhas: [["quantidade de negociações", fmtQtd(l.m.total)], ...(temArr ? ([[R_ARR, fmtR2(l.m.arrTotal)], ["valor negociado (R$)", fmtR2(l.m.valTotal)]] as Array<[string, string]>) : ([["valor (R$)", fmtR2(l.m.valTotal)]] as Array<[string, string]>))],
+    },
+    celulas: [l.rotulo, l.top, fmtQtd(l.m.total), ...(temArr ? [fmtR2(l.m.arrTotal)] : []), fmtR2(l.m.valTotal)],
   }));
   return (
     <ColunasLinha
       id="top10"
       pontos={pontos}
       nomeCol="quantidade de negociações"
-      nomeLin="valor (R$)"
+      nomeLin={temArr ? R_ARR : "valor (R$)"}
       fmtCol={fmtQtd}
       fmtLin={fmtMil}
       colInteira
@@ -191,24 +208,28 @@ export function TopGrafico({ linhas, total }: { linhas: LinhaTop[]; total: Medid
       rotuloDentro
       angulo={38}
       total={total}
+      temArr={temArr}
     />
   );
 }
 
-/** Negociação x Cidade: colunas = valor (R$), linha = quantidade (a lista vem ordenada por valor). */
-export function CidadeGrafico({ linhas, total }: { linhas: LinhaCidade[]; total: Medidas }) {
+/** Negociação x Cidade: colunas = valor (R$), o arrecadado quando há arquivo de arrecadação; linha = quantidade (lista ordenada por esse valor). */
+export function CidadeGrafico({ linhas, total, temArr }: { linhas: LinhaCidade[]; total: Medidas; temArr: boolean }) {
   const pontos: Ponto[] = linhas.map((l) => ({
     rotulo: l.rotulo,
-    col: reais(l.m.valTotal),
+    col: reais(temArr ? l.m.arrTotal : l.m.valTotal),
     lin: l.m.total,
-    dica: { titulo: l.rotulo, col: fmtR2(l.m.valTotal), lin: fmtQtd(l.m.total) },
-    celulas: [l.rotulo, fmtQtd(l.m.total), fmtR2(l.m.valTotal)],
+    dica: {
+      titulo: l.rotulo,
+      linhas: [...(temArr ? ([[R_ARR, fmtR2(l.m.arrTotal)], ["valor negociado (R$)", fmtR2(l.m.valTotal)]] as Array<[string, string]>) : ([["valor (R$)", fmtR2(l.m.valTotal)]] as Array<[string, string]>)), ["quantidade", fmtQtd(l.m.total)]],
+    },
+    celulas: [l.rotulo, fmtQtd(l.m.total), ...(temArr ? [fmtR2(l.m.arrTotal)] : []), fmtR2(l.m.valTotal)],
   }));
   return (
     <ColunasLinha
       id="cidades"
       pontos={pontos}
-      nomeCol="valor (R$)"
+      nomeCol={temArr ? R_ARR : "valor (R$)"}
       nomeLin="quantidade"
       fmtCol={fmtMil}
       fmtLin={fmtQtd}
@@ -218,6 +239,7 @@ export function CidadeGrafico({ linhas, total }: { linhas: LinhaCidade[]; total:
       rotuloDentro={false}
       angulo={50}
       total={total}
+      temArr={temArr}
     />
   );
 }

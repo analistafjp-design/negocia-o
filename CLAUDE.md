@@ -6,7 +6,7 @@ O dono é **Fábio Passos** (AnalistaFJP).
 ## O que é
 
 Painel das negociações do Interior por **frente de serviço e cluster**: a versão web do relatório *Negociações*
-(`Report Negociações Acumulado`) do Power BI. Lê planilhas `.xlsx` da pasta do usuário **no navegador**
+(`Report Negociações Acumulado`) do Power BI. Lê planilhas `.xlsx` (e os `.csv` de arrecadação) da pasta do usuário **no navegador**
 (File System Access API, Chrome/Edge) e mostra só o que está no print do Power BI: 6 cartões de quantidade,
 5 de valor, Negociações Comercial (cluster › frente › recurso), Top 10, Negociação x Cidade e Motivo da não
 Execução. Mesma stack do Painel Executivo (`analistafjp-design/painel-executivo`) e jeito do Pós-Corte
@@ -39,6 +39,23 @@ Hospedagem: **GitHub Pages**.
   do Power BI; pendente de conferir com um print do relatório). Não recoloque rolagem interna nem as tabelas de Top 10,
   Cidade e Comercial sem ele pedir. O rótulo do Motivo é legível
   (`legivel`/`quebrar`, `lib/formato.ts`).
+- **Arrecadação real** (pedido do usuário, 16/10/2026: "preciso trazer o valor arrecadado real. O que aparece nele hoje, são os
+  valores negociados e não refletem a realidade"; arquivos em `.../Dashboard Executivo Interior/Interior/Arrecadação`: "Arrecadação diária"
+  e pastas com "Arrecadação acumulada"; respostas dele: **só parcelas**, **arrecadado em destaque**, arquivos **.csv**).
+  `lib/arrecadacao-csv.ts` lê o CSV (colunas `Nº Ligação`, `Valor Pago`, `Data Pagto.`, `Tipo Fatura`, `Situação Pagto`; só
+  "PARCELA" + "Quitada" entra) e `lib/arrecadacao.ts` liga cada pagamento a uma negociação da **mesma matrícula feita até a
+  data do pagamento** (a mais recente; do mesmo dia, divide pelo valor negociado), cada pagamento uma vez, e o mesmo
+  pagamento em dois arquivos (diária × acumulada) vale uma vez. O resultado fica em `arr` de cada atividade/desdobro e
+  `medidas()` soma `arr*` na mesma conta dos `val*` (`Visao.temArr` liga a exibição). **Com arquivo de arrecadação o valor
+  grande é o arrecadado e o negociado fica pequeno ("arrecadado de R$ … negociados"; na árvore "de R$ …")** nos cartões de
+  valor, na árvore, no Top 10 e em Cidade; sem arquivo, a tela é a de antes. **Os filtros de mês e data são os da negociação,
+  não os do pagamento.** Pagamento sem negociação anterior fica só no resumo ("Detalhes da leitura"). **Na pasta o `.csv`
+  só é lido se "Arrecadação" aparece no nome do arquivo ou de uma pasta do caminho** (os outros nem são abertos); no Importar
+  arquivos vale o que o usuário escolheu. Não mude a regra (só parcelas, mesma matrícula, data do pagamento ≥ data da
+  negociação) sem ele pedir; **pendente de conferir com a base real** (ver "Pendências"). Os CSV de teste são sintéticos
+  e **sem acento no nome** (o Chromium do container não anexa arquivo com acento; o acento é testado em `core.test.mjs`).
+  A tabela `sr-only` dos gráficos fica **dentro de uma `div` `sr-only`**: tabela ignora a largura de 1px e alargava a página
+  no celular.
 - **Aviso da leitura** (pedido do usuário, 16/10/2026: "Isso aqui não precisa aparecer nessa tela. Muito feio!"):
   o resumo da carga ("Base carregada: …") e as observações (recursos sem setor, atividades repetidas, JSON fora do
   formato, código fora da tabela…) **não aparecem mais na tela**; ficam recolhidos em **"Detalhes da leitura", no
@@ -97,3 +114,7 @@ Hospedagem: **GitHub Pages**.
    divergência consciente do Power BI (que divide a posição entre empatados); não volte ao ranking denso sem pedido.
 3. `Text.BeforeDelimiter` sem hífen no recurso: tratado como vazio (sem setor), a atividade sai.
 4. Atividades repetidas entre arquivos não são removidas (o relatório também não); o aviso mostra quantas.
+5. Arrecadação: conferir com a base real (a) a escolha da negociação mais recente até a data do pagamento quando há mais de
+   uma, (b) se parcelas de outro parcelamento da mesma matrícula entram indevidamente, (c) se `Valor Pago` (e não
+   `Val. Autenticado`) é o valor certo, (d) o tamanho dos CSV acumulados (leitura por blocos de 4 MB; o resultado fica no
+   cache do navegador).
