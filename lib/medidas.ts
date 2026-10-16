@@ -143,12 +143,36 @@ const porTotal =
   (x: T, y: T): number =>
     (y.m.total || 0) - (x.m.total || 0) || (y.m.valTotal || 0) - (x.m.valTotal || 0) || rotulo(x).localeCompare(rotulo(y), "pt-BR");
 
-/** Ranking Negociações: dense, decrescente, sobre o critério total*0,15 + valor*0,0000001. */
-export function rankingDenso(criterios: Array<number | null>): number[] {
-  const distintos = [...new Set(criterios.filter((c): c is number => c !== null))].sort((x, y) => y - x);
-  const pos = new Map(distintos.map((c, i): [number, number] => [c, i + 1]));
-  return criterios.map((c) => (c === null ? distintos.length + 1 : (pos.get(c) as number)));
+export interface ItemRanking {
+  /** total*0,15 + valor*0,0000001 (BLANK = null). */
+  criterio: number | null;
+  /** Data (AAAA-MM-DD) da negociação mais recente do item; vazio se não houver. */
+  ultima: string;
+  rotulo: string;
 }
+
+/**
+ * Ranking Negociações, decrescente sobre o critério do Power BI (total*0,15 + valor*0,0000001), mas com desempate
+ * (pedido do usuário, 16/10/2026: no Power BI os empatados dividem a posição e o Top 10 passava de 10 linhas).
+ * Empatou o critério (mesma quantidade e mesmo valor): vale quem negociou por último; ainda empatado, o nome do
+ * recurso (A a Z). Devolve a posição 1..n de cada item, sem repetir; item sem critério (BLANK) fica no fim.
+ */
+export function posicoesDoRanking(itens: ItemRanking[]): number[] {
+  const c = (v: number | null): number => (v === null ? -Infinity : v);
+  const ordem = itens.map((_, i) => i).sort((a, b) => {
+    const x = itens[a];
+    const y = itens[b];
+    if (c(x.criterio) !== c(y.criterio)) return c(y.criterio) > c(x.criterio) ? 1 : -1;
+    if (x.ultima !== y.ultima) return x.ultima < y.ultima ? 1 : -1;
+    return x.rotulo.localeCompare(y.rotulo, "pt-BR");
+  });
+  const pos = new Array<number>(itens.length);
+  ordem.forEach((i, k) => (pos[i] = k + 1));
+  return pos;
+}
+
+/** Data da negociação principal mais recente (cobrança com Negociou = SIM). */
+const ultimaNegociacao = (as: Atividade[]): string => as.reduce((m, a) => (a.cob && a.sim && a.data > m ? a.data : m), "");
 
 /**
  * Calcula tudo o que o painel mostra para os filtros (mes, data, frente, cluster).
@@ -200,14 +224,12 @@ export function calcular(modelo: Modelo, f: Partial<Filtros> = {}): Visao {
   // Top 10 Negociações: recurso, só setor Comercial, sem os recursos da lista de exclusão
   const excl = new Set(EXCLUIDOS_TOP10.map(chave));
   const At = A0.filter((r) => r.sCom && !excl.has(chave(r.rec)));
-  const reg = [...agrupar(At, (r) => r.rec)].map(([rec, g]) => ({ rec, g, m: medidas(g.a, desdobrosDe(g.mats, porMat)), top: 0 }));
+  const reg = [...agrupar(At, (r) => r.rec)].map(([rec, g]) => ({ rec, g, m: medidas(g.a, desdobrosDe(g.mats, porMat)), top: 0, ultima: ultimaNegociacao(g.a) }));
   const crit = reg.map((r) => add(r.m.total === null ? null : r.m.total * 0.15, r.m.valTotal === null ? null : (r.m.valTotal / 10000) * 0.0000001));
-  const rank = rankingDenso(crit);
+  const rank = posicoesDoRanking(reg.map((r, i) => ({ criterio: crit[i], ultima: r.ultima, rotulo: r.rec })));
   reg.forEach((r, i) => (r.top = rank[i]));
   const visiveis = reg.filter((r) => r.top < TOP_N && (r.m.total || 0) > 0);
-  visiveis.sort(
-    (x, y) => (y.m.total || 0) - (x.m.total || 0) || x.top - y.top || (y.m.valTotal || 0) - (x.m.valTotal || 0) || x.rec.localeCompare(y.rec, "pt-BR")
-  );
+  visiveis.sort((x, y) => x.top - y.top); // posições únicas: a tabela segue o ranking
   const matsTop = new Set<string>();
   const aTop: Atividade[] = [];
   for (const r of visiveis) {

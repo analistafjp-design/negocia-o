@@ -167,9 +167,40 @@ test('Top 10 e Motivo da não Execução', async () => {
   await carregarPrint(page);
   await filtrarDiaDoPrint(page);
   const nomes = await page.locator('[data-painel="top10"] tbody tr').evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-linha')));
-  assert.ok(nomes.length >= 10);
+  assert.equal(nomes.length, 10, 'Top 10 com desempate: exatamente 10 linhas');
+  assert.deepEqual(await page.locator('[data-painel="top10"] tbody tr td:nth-child(2)').allTextContents(), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], 'posições do Top sem repetir');
   assert.ok(nomes.every((n) => !n.startsWith('D11')));
   assert.deepEqual(await page.locator('[data-painel="motivo"] [data-motivo]').allTextContents(), ['DUPLICIDADE DE MATRÍCULA: 1']);
+  semErros(page);
+  await page.context().close();
+});
+
+test('painéis de baixo: duas linhas, sem rolagem interna, Total à vista e recurso numa linha só', async () => {
+  const page = await abrir({ w: 1440, h: 900 });
+  await carregarPrint(page);
+  await filtrarDiaDoPrint(page);
+  const caixa = (id) => page.locator(`[data-painel="${id}"]`).boundingBox();
+  const [com, top, cid, mot] = await Promise.all(['comercial', 'top10', 'cidade', 'motivo'].map(caixa));
+  assert.ok(Math.abs(com.y - top.y) < 2, 'Negociações Comercial e Top 10 na mesma linha');
+  assert.ok(Math.abs(cid.y - mot.y) < 2, 'Negociação x Cidade e Motivo na mesma linha');
+  assert.ok(cid.y >= com.y + com.height - 1, 'a segunda linha vem abaixo da primeira');
+  assert.ok(com.width > top.width && cid.width > mot.width, 'a tabela fica mais larga que o painel ao lado');
+  for (const id of ['comercial', 'top10', 'cidade', 'motivo']) {
+    const sobra = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollHeight - el.clientHeight);
+    assert.ok(sobra <= 1, 'rolagem interna em ' + id + ': ' + sobra + 'px');
+  }
+  for (const id of ['comercial', 'top10', 'cidade']) {
+    const painel = await caixa(id);
+    const total = await page.locator(`[data-painel="${id}"] [data-total="neg"]`).boundingBox();
+    assert.ok(total.y + total.height <= painel.y + painel.height + 1, 'Total de ' + id + ' dentro do painel, sem rolar');
+  }
+  const alturas = await page.locator('[data-painel="top10"] tbody tr td:first-child').evaluateAll((tds) => tds.map((td) => td.getBoundingClientRect().height));
+  assert.ok(alturas.length >= 10 && alturas.every((h) => h < 44), 'recurso do Top 10 numa linha só: ' + alturas.join(','));
+  assert.equal(await page.locator('[data-painel="cidade"] th[aria-sort="descending"]').count(), 1, 'cabeçalho Neg. Total marca a ordenação');
+  assert.match(limpa(await page.textContent('[data-painel="cidade"] th[aria-sort="descending"]')), /Neg\. Total/);
+  await page.locator('[data-painel="motivo"] svg text:has(> title) tspan').first().waitFor();
+  const rotulo = (await page.locator('[data-painel="motivo"] svg text:has(> title) tspan').allTextContents()).join(' ');
+  assert.equal(rotulo, 'Duplicidade de Matrícula', 'rótulo do motivo legível, sem caixa alta');
   semErros(page);
   await page.context().close();
 });
@@ -248,6 +279,10 @@ test('celular (390 px): sem rolagem lateral e cartões legíveis', async () => {
   await filtrarDiaDoPrint(page);
   const sobra = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(sobra <= 0, 'rolagem lateral de ' + sobra + 'px');
+  for (const id of ['comercial', 'top10', 'cidade', 'motivo']) {
+    const lateral = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollWidth - el.clientWidth);
+    assert.ok(lateral <= 1, 'rolagem lateral dentro de ' + id + ': ' + lateral + 'px');
+  }
   assert.equal(await kpi(page, 'total'), '132');
   semErros(page);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'celular.png'), fullPage: true });

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-/** Painel com a faixa de título em grafite e o conteúdo com rolagem própria. */
+/** Painel com a faixa de título em azul; o conteúdo cresce por inteiro (sem rolagem interna), então o Total fica sempre à vista. */
 export function Painel({ id, titulo, children }: { id: string; titulo: string; children: ReactNode }) {
   return (
     <Card data-painel={id} className="gap-0 overflow-hidden py-0 shadow-sm" aria-labelledby={`t-${id}`}>
@@ -10,7 +10,7 @@ export function Painel({ id, titulo, children }: { id: string; titulo: string; c
           {titulo}
         </CardTitle>
       </CardHeader>
-      <CardContent className="scrollbar-thin max-h-[520px] min-h-[120px] overflow-auto p-0 xl:max-h-[560px]">{children}</CardContent>
+      <CardContent className="scrollbar-thin min-h-[120px] overflow-x-auto p-0">{children}</CardContent>
     </Card>
   );
 }
