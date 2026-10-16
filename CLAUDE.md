@@ -28,8 +28,14 @@ Hospedagem: **GitHub Pages**.
   `fmtMil`); o balão traz os números exatos, o Total (`data-total`) fica numa faixa sob o gráfico e uma tabela escondida
   (`sr-only`) leva os mesmos números para leitor de tela e para os testes. Os dois eixos têm 5 divisões
   (`escalaDoEixo`, `lib/eixo.ts`). Em tela estreita o gráfico tem largura mínima e rola para o lado **dentro do painel**,
-  com aviso. A matriz ainda é a tabela, agora em largura total; o usuário viu modelos A/B/C dela e não escolheu. Não
-  recoloque rolagem interna nem as tabelas de Top 10 e Cidade sem ele pedir. O rótulo do Motivo é legível
+  com aviso. **A matriz Negociações Comercial é uma árvore** (`components/arvore-comercial.tsx`; pedido do usuário, 16/10/2026,
+  "Pode fazer a árvore", depois de ver a prévia): Total > cluster > frente > recurso, com **+/−** para abrir e fechar
+  (as frentes abrem fechadas e os recursos aparecem no +). Em 1280 px ou mais ela abre para o lado, ligada por fios;
+  abaixo disso empilha, com recuo (CSS `.arv*` em `app/globals.css`). O Total da raiz (`data-total`) é o da matriz
+  (pode ser 131 quando os cartões dizem 132, como no print). **As frentes de um cluster podem somar mais que o cluster**:
+  o desdobro de uma matrícula com atividades em mais de uma frente conta em cada frente e uma vez no cluster (medida
+  do Power BI; pendente de conferir com um print do relatório). Não recoloque rolagem interna nem as tabelas de Top 10,
+  Cidade e Comercial sem ele pedir. O rótulo do Motivo é legível
   (`legivel`/`quebrar`, `lib/formato.ts`).
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.

@@ -64,7 +64,7 @@ const limpa = (t) => t.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
 const kpi = async (page, k) => limpa(await page.textContent(`[data-kpi="${k}"] [data-kpi-valor]`));
 const celulas = (tr) => [...tr.children].map((c) => c.textContent).join(' ');
 const linha = async (page, painel, rotulo) =>
-  limpa(await page.locator(`[data-painel="${painel}"] tr[data-linha="${rotulo}"]`).first().evaluate(celulas));
+  limpa(await page.locator(`[data-painel="${painel}"] [data-linha="${rotulo}"]`).first().evaluate(celulas));
 const arquivosDoPrint = () => fs.readdirSync(PRINT).map((n) => path.join(PRINT, n));
 
 async function carregarPrint(page) {
@@ -130,7 +130,7 @@ test('matriz Cluster Perfil > frente: valores do print, abrir e fechar linhas', 
   assert.equal(await linha(page, 'comercial', '(sem cluster)'), '(sem cluster) 5 R$ 2.249,83');
   assert.equal(await linha(page, 'comercial', 'Nunca Pagou'), 'Nunca Pagou 3 R$ 282,69');
   // frentes abertas por padrão (primeira ocorrência de cada nome é a do primeiro cluster: Inadimplente)
-  const frentes = (await page.locator('[data-painel="comercial"] tr[data-nivel="1"]').evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent).join(' ')))).map(limpa);
+  const frentes = (await page.locator('[data-painel="comercial"] [data-nivel="1"]').evaluateAll((nos) => nos.map((no) => [...no.children].map((c) => c.textContent).join(' ')))).map(limpa);
   assert.ok(frentes.includes('Leitura 65 R$ 15.787,90'));
   assert.ok(frentes.includes('Corte e Religa 5 R$ 16.138,98'));
   assert.ok(frentes.includes('Pós Corte 1 R$ 2.015,86'));
@@ -138,16 +138,48 @@ test('matriz Cluster Perfil > frente: valores do print, abrir e fechar linhas', 
   assert.equal(limpa(await page.textContent('[data-painel="comercial"] [data-total="neg"]')), '131');
   assert.equal(limpa(await page.textContent('[data-painel="comercial"] [data-total="valor"]')), 'R$ 58.104,64');
   // fechar o primeiro cluster esconde as frentes dele
-  const antes = await page.locator('[data-painel="comercial"] tr[data-nivel="1"]').count();
+  const antes = await page.locator('[data-painel="comercial"] [data-nivel="1"]').count();
   await page.getByRole('button', { name: 'Recolher Inadimplente' }).click();
-  assert.equal(await page.locator('[data-painel="comercial"] tr[data-nivel="1"]').count(), antes - 3);
+  assert.equal(await page.locator('[data-painel="comercial"] [data-nivel="1"]').count(), antes - 3);
   await page.getByRole('button', { name: 'Expandir Inadimplente' }).click();
   // o terceiro nível (recurso) abre pela frente
-  assert.equal(await page.locator('[data-painel="comercial"] tr[data-nivel="2"]').count(), 0);
+  assert.equal(await page.locator('[data-painel="comercial"] [data-nivel="2"]').count(), 0);
   await page.getByRole('button', { name: 'Expandir Corte e Religa' }).first().click();
-  assert.ok((await page.locator('[data-painel="comercial"] tr[data-nivel="2"]').count()) > 0);
+  assert.ok((await page.locator('[data-painel="comercial"] [data-nivel="2"]').count()) > 0);
   semErros(page);
   await page.context().close();
+});
+
+test('matriz em árvore: Total > cluster > frente abre para o lado em tela larga e empilha no celular', async () => {
+  const page = await abrir({ w: 1440, h: 900 });
+  await carregarPrint(page);
+  await filtrarDiaDoPrint(page);
+  const raiz = await page.locator('[data-painel="comercial"] [data-total="neg"]').boundingBox();
+  const cluster = await page.locator('[data-painel="comercial"] [data-nivel="0"]').first().boundingBox();
+  const frente = await page.locator('[data-painel="comercial"] [data-nivel="1"]').first().boundingBox();
+  assert.ok(raiz.x + raiz.width <= cluster.x, 'cluster à direita do Total');
+  assert.ok(cluster.x + cluster.width <= frente.x, 'frente à direita do cluster');
+  assert.equal(await page.locator('[data-painel="comercial"] [data-nivel="0"]').count(), 4, 'quatro clusters do print');
+  assert.equal(limpa(await page.textContent('[data-painel="comercial"] [data-total="valor"]')), 'R$ 58.104,64');
+  // o "+" da frente abre os recursos (terceiro nível) à direita dela e o "−" fecha
+  await page.getByRole('button', { name: 'Expandir Leitura' }).first().click();
+  const recurso = await page.locator('[data-painel="comercial"] [data-nivel="2"]').first().boundingBox();
+  assert.ok(frente.x + frente.width <= recurso.x, 'recurso à direita da frente');
+  await page.getByRole('button', { name: 'Recolher Leitura' }).first().click();
+  assert.equal(await page.locator('[data-painel="comercial"] [data-nivel="2"]').count(), 0);
+  semErros(page);
+  await page.context().close();
+  // celular: tudo empilhado, sem rolagem lateral
+  const cel = await abrir({ w: 390, h: 844 });
+  await carregarPrint(cel);
+  await filtrarDiaDoPrint(cel);
+  const c = await cel.locator('[data-painel="comercial"] [data-nivel="0"]').first().boundingBox();
+  const f = await cel.locator('[data-painel="comercial"] [data-nivel="1"]').first().boundingBox();
+  assert.ok(f.y >= c.y + c.height - 1 && f.x > c.x, 'frente abaixo do cluster, com recuo');
+  const lateral = await cel.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(lateral <= 0, 'rolagem lateral de ' + lateral + 'px');
+  semErros(cel);
+  await cel.context().close();
 });
 
 test('Negociação x Cidade: o total dos cartões passa 1 da soma das cidades (131 x 132 do print)', async () => {
