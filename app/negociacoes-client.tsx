@@ -451,50 +451,41 @@ export default function NegociacoesClient() {
           ))}
         </section>
 
-        {/* Em tela larga: matriz à esquerda; Top 10 e Motivo à direita; Negociação x Cidade em largura total embaixo.
-            No celular tudo empilha na ordem do relatório: Comercial, Top 10, Cidade, Motivo. */}
-        <section aria-label="Detalhamento" className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:grid-rows-[auto_auto_1fr_auto]">
-          <div className="min-w-0 lg:col-start-1 lg:row-span-3 lg:row-start-1">
-            <Painel id="comercial" titulo="Negociações Comercial">
-              {visao && visao.comercial.linhas.length ? (
-                <ComercialTabela
-                  linhas={visao.comercial.linhas}
-                  total={visao.comercial.total}
-                  aberto={aberto}
-                  aoAlternar={(id, abre) => setAberto((a) => ({ ...a, [id]: abre }))}
-                />
-              ) : (
-                <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
-              )}
-            </Painel>
-          </div>
-          <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-            <Painel id="top10" titulo="Top 10 Negociações">
-              {visao && visao.top10.linhas.length ? (
-                <TopGrafico linhas={visao.top10.linhas} total={visao.top10.total} />
-              ) : (
-                <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
-              )}
-            </Painel>
-          </div>
-          <div className="min-w-0 lg:col-span-2 lg:row-start-4">
-            <Painel id="cidade" titulo="Negociação x Cidade">
-              {visao && visao.cidades.linhas.length ? (
-                <CidadeGrafico linhas={visao.cidades.linhas} total={visao.cidades.total} />
-              ) : (
-                <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
-              )}
-            </Painel>
-          </div>
-          <div className="min-w-0 lg:col-start-2 lg:row-start-2">
-            <Painel id="motivo" titulo="Motivo da não Execução">
-              {visao && visao.motivos.length ? (
-                <MotivoChart linhas={visao.motivos} />
-              ) : (
-                <Vazio texto={temDados ? "Nenhum motivo de não execução neste filtro." : "Conecte a pasta para ver os dados."} />
-              )}
-            </Painel>
-          </div>
+        {/* Os quatro painéis em tela cheia, um embaixo do outro, na ordem do relatório (pedido do usuário, 16/10/2026). */}
+        <section aria-label="Detalhamento" className="grid grid-cols-[minmax(0,1fr)] gap-4">
+          <Painel id="comercial" titulo="Negociações Comercial">
+            {visao && visao.comercial.linhas.length ? (
+              <ComercialTabela
+                linhas={visao.comercial.linhas}
+                total={visao.comercial.total}
+                aberto={aberto}
+                aoAlternar={(id, abre) => setAberto((a) => ({ ...a, [id]: abre }))}
+              />
+            ) : (
+              <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
+            )}
+          </Painel>
+          <Painel id="top10" titulo="Top 10 Negociações">
+            {visao && visao.top10.linhas.length ? (
+              <TopGrafico linhas={visao.top10.linhas} total={visao.top10.total} />
+            ) : (
+              <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
+            )}
+          </Painel>
+          <Painel id="cidade" titulo="Negociação x Cidade">
+            {visao && visao.cidades.linhas.length ? (
+              <CidadeGrafico linhas={visao.cidades.linhas} total={visao.cidades.total} />
+            ) : (
+              <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
+            )}
+          </Painel>
+          <Painel id="motivo" titulo="Motivo da não Execução">
+            {visao && visao.motivos.length ? (
+              <MotivoChart linhas={visao.motivos} />
+            ) : (
+              <Vazio texto={temDados ? "Nenhum motivo de não execução neste filtro." : "Conecte a pasta para ver os dados."} />
+            )}
+          </Painel>
         </section>
 
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pb-4 text-xs text-muted-foreground">

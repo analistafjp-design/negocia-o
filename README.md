@@ -16,8 +16,10 @@ Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho az
 | Cartões de valor | Negociação Principal $ · $ Desdobro Corte · $ Desdobro · $ Desdobro Pós Corte · **Negociação Tot $** |
 | Negociações Comercial | Cluster Perfil › frente de serviço › recurso (linhas que abrem e fecham), com total |
 | Top 10 Negociações | Gráfico de colunas (quantidade) e linha (valor), por recurso, na ordem do ranking |
-| Negociação x Cidade | Gráfico de colunas (valor) e linha (quantidade), por cidade, em largura total |
+| Negociação x Cidade | Gráfico de colunas (valor) e linha (quantidade), por cidade |
 | Motivo da não Execução | Cobranças sem negociação, por motivo |
+
+Os quatro painéis de baixo ocupam a largura toda, um embaixo do outro, nessa ordem.
 
 `—` é o BLANK do Power BI (sem registros), diferente de `0`.
 

@@ -120,7 +120,7 @@ function ColunasLinha({ id, pontos, nomeCol, nomeLin, fmtCol, fmtLin, colInteira
             <YAxis yAxisId="col" orientation="left" width={52} domain={[0, ec.max]} ticks={ec.ticks} tickFormatter={fmtMil} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
             <YAxis yAxisId="lin" orientation="right" width={58} domain={[0, el.max]} ticks={el.ticks} tickFormatter={fmtMil} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
             <Tooltip cursor={{ fill: "var(--marca-suave)", opacity: 0.6 }} content={(p) => <Dica active={p.active} payload={p.payload as ReadonlyArray<{ payload?: Ponto }>} nomeCol={nomeCol} nomeLin={nomeLin} />} />
-            <Bar yAxisId="col" dataKey="col" fill={cores.col} radius={[3, 3, 0, 0]} maxBarSize={44} isAnimationActive={false}>
+            <Bar yAxisId="col" dataKey="col" fill={cores.col} radius={[3, 3, 0, 0]} maxBarSize={56} isAnimationActive={false}>
               <LabelList
                 dataKey="col"
                 position={rotuloDentro ? "insideBottom" : "top"}

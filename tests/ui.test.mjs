@@ -175,17 +175,20 @@ test('Top 10 e Motivo da não Execução', async () => {
   await page.context().close();
 });
 
-test('painéis de baixo: matriz à esquerda, Top 10 e Motivo à direita, Cidade em largura total, sem rolagem interna e com o Total à vista', async () => {
+test('painéis de baixo: os quatro em tela cheia, um embaixo do outro, na ordem do relatório; sem rolagem interna e com o Total à vista', async () => {
   const page = await abrir({ w: 1440, h: 900 });
   await carregarPrint(page);
   await filtrarDiaDoPrint(page);
   const caixa = (id) => page.locator(`[data-painel="${id}"]`).boundingBox();
-  const [com, top, cid, mot] = await Promise.all(['comercial', 'top10', 'cidade', 'motivo'].map(caixa));
-  assert.ok(com.x < top.x, 'matriz Comercial à esquerda dos gráficos');
-  assert.ok(Math.abs(com.y - top.y) < 2, 'matriz Comercial e Top 10 começam na mesma altura');
-  assert.ok(top.y + top.height <= mot.y && Math.abs(top.x - mot.x) < 2, 'Motivo logo abaixo do Top 10, alinhado a ele');
-  assert.ok(cid.y >= Math.max(com.y + com.height, mot.y + mot.height) - 1, 'Negociação x Cidade abaixo de tudo');
-  assert.ok(Math.abs(cid.x - com.x) < 2 && Math.abs(cid.x + cid.width - (top.x + top.width)) < 2, 'Negociação x Cidade na largura toda');
+  const ordem = ['comercial', 'top10', 'cidade', 'motivo'];
+  const caixas = await Promise.all(ordem.map(caixa));
+  const cartoes = await page.locator('[data-kpi="total"]').boundingBox();
+  caixas.forEach((c, i) => {
+    assert.ok(Math.abs(c.x - caixas[0].x) < 2 && Math.abs(c.width - caixas[0].width) < 2, ordem[i] + ' com a mesma largura e alinhado aos outros');
+    if (i) assert.ok(c.y >= caixas[i - 1].y + caixas[i - 1].height - 1, ordem[i] + ' abaixo de ' + ordem[i - 1]);
+  });
+  assert.ok(caixas[0].width > 1300, 'tela cheia: ' + caixas[0].width + 'px de 1440');
+  assert.ok(Math.abs(caixas[0].x + caixas[0].width - (cartoes.x + cartoes.width)) < 2, 'alinhado à borda direita dos cartões');
   for (const id of ['comercial', 'top10', 'cidade', 'motivo']) {
     const sobra = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollHeight - el.clientHeight);
     assert.ok(sobra <= 1, 'rolagem interna em ' + id + ': ' + sobra + 'px');
