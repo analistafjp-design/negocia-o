@@ -9,6 +9,8 @@ import * as Leitura from '../lib/leitura.ts';
 import * as Modelo from '../lib/modelo.ts';
 import * as Medidas from '../lib/medidas.ts';
 import * as Valores from '../lib/valores.ts';
+import * as Fontes from '../lib/fontes.ts';
+import { mensagemDaCarga } from '../lib/mensagens.ts';
 import { RECURSOS, SERVICOS } from '../lib/tabelas.ts';
 
 const N = { ...Leitura, ...Modelo, ...Medidas, parseValor: Valores.parseValor, parseDateValue: Valores.parseDateValue };
@@ -403,6 +405,79 @@ test('sem arquivos: tudo BLANK e nenhuma linha', () => {
   assert.equal(v.cards.total, null);
   assert.equal(v.cards.valTotal, null);
   assert.deepEqual([v.comercial.linhas.length, v.top10.linhas.length, v.cidades.linhas.length, v.motivos.length], [0, 0, 0, 0]);
+});
+
+/* ------------------------------------------------------------------ */
+/* Pasta: só os arquivos do painel (pelo nome)                         */
+/* ------------------------------------------------------------------ */
+
+/** Entrada de pasta com o conteúdo de uma planilha de teste; `abertos` registra os que foram abertos. */
+function entradaDe(p, nome, abertos, caminho) {
+  return {
+    name: nome,
+    path: caminho ?? nome,
+    getFile: async () => {
+      abertos.push(nome);
+      return new File([fs.readFileSync(p)], nome, { lastModified: 1 });
+    },
+  };
+}
+const opcoesPasta = (extra) => ({ cache: new Map(), assinaturaAnterior: '', auto: false, soPorNome: true, temModelo: false, ...extra });
+
+test('pasta: só entram os .xlsx com "Atividade" ou "Cluster" no nome; o "Termos de Janeiro a Agosto" é ignorado sem ser aberto', async () => {
+  const abertos = [];
+  const entradas = [
+    entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades-INTERIOR_29_09_26 (3).xlsx', abertos),
+    entradaDe(fx('print', 'Cluster_2026-09.xlsx'), 'Cluster_2026-09.xlsx', abertos),
+    // tem colunas de atividades, mas o nome não é do painel: tem de ficar de fora
+    entradaDe(fx('casos', 'valores_em_texto.xlsx'), 'Termos de Janeiro a Agosto.xlsx', abertos),
+    // subpasta também é lida
+    entradaDe(fx('casos', 'varias_abas.xlsx'), 'Atividades-INTERIOR_01_01_26.xlsx', abertos, 'De Janeiro a Setembro/Atividades-INTERIOR_01_01_26.xlsx'),
+    entradaDe(fx('casos', 'varias_abas.xlsx'), '~$Atividades-INTERIOR_01_01_26.xlsx', abertos), // temporário do Excel
+  ];
+  const rel = await Fontes.carregarArquivos(entradas, opcoesPasta());
+  assert.deepEqual(rel.ignoradosPorNome, ['Termos de Janeiro a Agosto.xlsx']);
+  assert.ok(!abertos.includes('Termos de Janeiro a Agosto.xlsx'), 'o arquivo ignorado nem é aberto');
+  assert.ok(!abertos.includes('~$Atividades-INTERIOR_01_01_26.xlsx'));
+  assert.equal(rel.modelo.resumo.arquivos, 2, 'dois arquivos de atividades (o da subpasta inclusive)');
+  assert.equal(rel.modelo.resumo.atividades, 134 + 1);
+  const msg = mensagemDaCarga(rel, { auto: false, fonte: 'Interior', temModeloAnterior: false });
+  assert.ok(!msg.items.some((t) => /Termos/.test(t)), 'ignorar pelo nome não é problema: não vira item de aviso, só consta no resumo');
+  assert.match(msg.detail, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
+});
+
+test('arquivos escolhidos à mão (Importar Excel) são lidos pelas colunas, qualquer que seja o nome', async () => {
+  const abertos = [];
+  const entradas = [
+    entradaDe(fx('print', 'Report Atividade 2026-09-29.xlsx'), 'Atividades-INTERIOR_29_09_26.xlsx', abertos),
+    entradaDe(fx('casos', 'valores_em_texto.xlsx'), 'Termos de Janeiro a Agosto.xlsx', abertos),
+  ];
+  const rel = await Fontes.carregarArquivos(entradas, opcoesPasta({ soPorNome: false }));
+  assert.deepEqual(rel.ignoradosPorNome, []);
+  assert.equal(rel.modelo.resumo.arquivos, 2);
+});
+
+test('nome do painel: "Atividade" ou "Cluster", sem diferenciar maiúsculas nem acentos', () => {
+  for (const ok of ['Atividades-INTERIOR_14_10_26 (3).xlsx', 'ATIVIDADE.xlsx', 'Cluster_2026-09.xlsx', 'relatório de atividades.xlsx', 'CLUSTER saldo.xlsx']) {
+    assert.equal(Fontes.ehArquivoDoPainel(ok), true, ok);
+  }
+  for (const no of ['Termos de Janeiro a Agosto.xlsx', 'Solicitação geral.xlsx', 'Resumo.xlsx']) {
+    assert.equal(Fontes.ehArquivoDoPainel(no), false, no);
+  }
+});
+
+test('pasta só com planilhas de outro assunto: aviso claro, nenhum arquivo aberto e nenhum modelo', async () => {
+  const abertos = [];
+  const entradas = [entradaDe(fx('casos', 'valores_em_texto.xlsx'), 'Termos de Janeiro a Agosto.xlsx', abertos), entradaDe(fx('casos', 'sem_cabecalho.xlsx'), 'Resumo.xlsx', abertos)];
+  const rel = await Fontes.carregarArquivos(entradas, opcoesPasta());
+  assert.equal(rel.semArquivosDoPainel, true);
+  assert.equal(rel.modelo, null);
+  assert.deepEqual(abertos, []);
+  const msg = mensagemDaCarga(rel, { auto: false, fonte: 'Interior', temModeloAnterior: true });
+  assert.equal(msg.kind, 'warning');
+  assert.match(msg.title, /Nenhum arquivo de Atividades ou Cluster_ na pasta/);
+  assert.match(msg.detail, /Termos de Janeiro a Agosto\.xlsx, Resumo\.xlsx/);
+  assert.match(msg.detail, /A base anterior foi mantida/);
 });
 
 test('relatório com todas as colunas obrigatórias presentes e opcionais ausentes carrega com aviso (cidade/motivo)', async () => {

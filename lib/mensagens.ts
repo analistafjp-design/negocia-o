@@ -14,6 +14,12 @@ export interface Aviso {
   actions?: Array<{ label: string; run: () => void }>;
 }
 
+/** Até 3 nomes (sem o caminho das subpastas) e "e mais N". */
+function nomesIgnorados(caminhos: string[]): string {
+  const nomes = caminhos.map((c) => c.slice(c.lastIndexOf("/") + 1));
+  return nomes.slice(0, 3).join(", ") + (nomes.length > 3 ? " e mais " + (nomes.length - 3) : "");
+}
+
 export function mensagemDaCarga(rel: RelatorioCarga, o: { auto: boolean; fonte: string; temModeloAnterior: boolean }): Aviso | null {
   const manteve = o.temModeloAnterior ? " A base anterior foi mantida." : "";
   if (rel.semXlsx) {
@@ -25,6 +31,15 @@ export function mensagemDaCarga(rel: RelatorioCarga, o: { auto: boolean; fonte: 
         "Coloque na pasta os arquivos de atividades e o arquivo Cluster_ (.xlsx). Subpastas são lidas; arquivos ~$ temporários são ignorados." +
         manteve,
       items: rel.ignoradosFormato.map((p) => "Formato não suportado (salve como .xlsx): " + p),
+    };
+  }
+  if (rel.semArquivosDoPainel) {
+    return {
+      kind: "warning",
+      title: "Nenhum arquivo de Atividades ou Cluster_ na pasta",
+      detail:
+        (o.fonte ? "Fonte: " + o.fonte + ". " : "") +
+        'Na pasta só são lidos os .xlsx com "Atividade" ou "Cluster" no nome (como no Power BI). Ignorados: ' + nomesIgnorados(rel.ignoradosPorNome) + "." + manteve,
     };
   }
   if (rel.semMudanca) return null;
@@ -73,7 +88,10 @@ export function mensagemDaCarga(rel: RelatorioCarga, o: { auto: boolean; fonte: 
       fmtQtd(r.desdobros) + " " + plural(r.desdobros, "desdobro", "desdobros") + " de " + r.arquivos + " " + plural(r.arquivos, "arquivo", "arquivos"),
     detail:
       "Cluster: " + fmtQtd(r.clusterMatriculas) + " " + plural(r.clusterMatriculas, "matrícula", "matrículas") + " de " + r.arquivosCluster + " " +
-      plural(r.arquivosCluster, "arquivo", "arquivos") + ". Lidos do arquivo agora: " + rel.leitura.lidos + " · reaproveitados: " + rel.leitura.reaproveitados + ".",
+      plural(r.arquivosCluster, "arquivo", "arquivos") + ". Lidos do arquivo agora: " + rel.leitura.lidos + " · reaproveitados: " + rel.leitura.reaproveitados + "." +
+      (rel.ignoradosPorNome.length
+        ? ' Ignorados (sem "Atividade" nem "Cluster" no nome): ' + nomesIgnorados(rel.ignoradosPorNome) + "."
+        : ""),
     items: itens,
   };
 }

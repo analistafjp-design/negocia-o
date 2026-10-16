@@ -15,8 +15,9 @@ Hospedagem: **GitHub Pages**.
 
 ## Como trabalhar com o usuário
 
-- O cabeçalho mostra **só o nome "Negociação"** e o cartão vazio só tem o botão Conectar pasta (pedido do
-  usuário, 16/10/2026): não recoloque subtítulo, selo nem os quatro quadrinhos de apresentação.
+- O cabeçalho mostra **só o nome "Negociação"** e **o botão Conectar pasta existe uma vez só, no cabeçalho**
+  (pedidos do usuário, 16/10/2026): não recoloque subtítulo, selo, os quatro quadrinhos de apresentação nem
+  um cartão com outro botão no corpo da página.
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.
@@ -38,8 +39,11 @@ Hospedagem: **GitHub Pages**.
   `--marca*` de `app/globals.css` (e as classes `bg-marca`, `from-marca-media`… do Tailwind); não espalhe cor
   fixa nos componentes. Cores semânticas só nos avisos (verde/âmbar/vermelho bem suaves).
 - **Indicador sem coluna** não vira zero silencioso: o arquivo é recusado dizendo qual coluna falta.
-- **Arquivos reconhecidos pelas colunas**, não pelo nome. Planilhas que não são atividades nem Cluster são
-  ignoradas (e listadas no aviso).
+- **Pasta: só os .xlsx com "Atividade" ou "Cluster" no nome** (a regra do Power BI; sem diferenciar maiúsculas
+  nem acentos, subpastas incluídas). Os outros, como o "Termos de Janeiro a Agosto.xlsx" (pedido do usuário,
+  16/10/2026: "ignore esse arquivo e leia todo o resto"), **nem são abertos** e só constam no resumo da leitura
+  (`ehArquivoDoPainel`, `lib/fontes.ts`). Nos arquivos escolhidos à mão (Importar Excel) vale o que o usuário
+  escolheu, reconhecido pelas colunas. Dentro de um arquivo do painel, a aba é achada pelas colunas.
 - As tabelas de códigos e recursos (`lib/tabelas.ts`) são **geradas** do relatório por
   `tools/gerar_tabelas.py`; não edite à mão.
 

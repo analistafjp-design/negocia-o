@@ -126,7 +126,6 @@ export default function NegociacoesClient() {
   const [fonte, setFonte] = useState<Fonte | null>(null);
   const [leituraEm, setLeituraEm] = useState<Date | null>(null);
   const [verificadaEm, setVerificadaEm] = useState<Date | null>(null);
-  const picker = useSyncExternalStore(semAssinatura, temPicker, () => false);
   const gravacao = useSyncExternalStore(semAssinatura, temIdb, () => false);
 
   const cache = useRef(new Map<string, ResultadoArquivo>());
@@ -148,7 +147,11 @@ export default function NegociacoesClient() {
   const visao = useMemo(() => (modelo ? calcular(modelo, filtros) : null), [modelo, filtros]);
 
   /** Lê os arquivos e atualiza o painel; mantém a base anterior quando nada válido é carregado. */
-  const carregar = useCallback(async (entradas: Entrada[], auto: boolean, nomeFonte: string) => {
+  /**
+   * `soPorNome`: ao ler uma pasta, só entram os .xlsx com "Atividade" ou "Cluster" no nome (como no Power BI).
+   * Nos arquivos escolhidos à mão (Importar Excel) vale o que o usuário escolheu.
+   */
+  const carregar = useCallback(async (entradas: Entrada[], auto: boolean, nomeFonte: string, soPorNome: boolean) => {
     if (ocupado.current) return;
     ocupado.current = true;
     setCarregando(true);
@@ -157,6 +160,7 @@ export default function NegociacoesClient() {
         cache: cache.current,
         assinaturaAnterior: assinatura.current,
         auto,
+        soPorNome,
         temModelo: modeloRef.current !== null,
         onProgresso: (p) => {
           if (auto || (p.fracao < 1 && Date.now() - ultimoProgresso.current < 120)) return;
@@ -204,7 +208,7 @@ export default function NegociacoesClient() {
             return;
           }
         }
-        await carregar(await listarPasta(f.handle), auto, f.nome);
+        await carregar(await listarPasta(f.handle), auto, f.nome, true);
       } catch (err) {
         setAviso({ kind: "error", title: "Não foi possível ler a pasta", detail: amigavel(err) + (modeloRef.current ? " A base anterior foi mantida." : "") });
       }
@@ -253,7 +257,7 @@ export default function NegociacoesClient() {
     const nova: Fonte = { kind: "pasta", modo: "input", nome: primeiro.split("/")[0] || "pasta selecionada", entradas: entradasDeArquivos(arquivos) };
     setFonte(nova);
     assinatura.current = "";
-    void carregar(nova.entradas as Entrada[], false, nova.nome);
+    void carregar(nova.entradas as Entrada[], false, nova.nome, true);
     e.target.value = "";
   };
   const aoEscolherArquivos = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,7 +271,7 @@ export default function NegociacoesClient() {
     };
     setFonte(nova);
     assinatura.current = "";
-    void carregar(nova.entradas as Entrada[], false, nova.nome);
+    void carregar(nova.entradas as Entrada[], false, nova.nome, false);
     e.target.value = "";
   };
 
@@ -396,17 +400,6 @@ export default function NegociacoesClient() {
 
       <div className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-4 sm:px-5 sm:py-6 lg:px-8">
         {aviso ? <AvisoView aviso={aviso} aoFechar={() => setAviso(null)} /> : null}
-
-        {!temDados ? (
-          <Card data-vazio className="border-dashed py-0 shadow-sm">
-            <CardContent className="flex justify-center px-4 py-8">
-              <Button size="lg" className="bg-marca hover:bg-marca-media" onClick={() => void conectarPasta()} disabled={carregando}>
-                <FolderOpen />
-                {picker ? "Conectar pasta" : "Escolher pasta"}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
 
         <Card className="py-0 shadow-sm" aria-label="Filtros">
           <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
