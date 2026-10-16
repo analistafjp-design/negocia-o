@@ -10,6 +10,7 @@ import * as Modelo from '../lib/modelo.ts';
 import * as Medidas from '../lib/medidas.ts';
 import * as Valores from '../lib/valores.ts';
 import * as Fontes from '../lib/fontes.ts';
+import * as Formato from '../lib/formato.ts';
 import { mensagemDaCarga } from '../lib/mensagens.ts';
 import { RECURSOS, SERVICOS } from '../lib/tabelas.ts';
 
@@ -131,7 +132,8 @@ test('Motivo da não Execução: só cobrança sem negociação; sem SUSPENSO, v
 
 test('Top 10: recursos do setor Comercial, ordenados por negociações, com Top e total das linhas exibidas', () => {
   const t = N.calcular(print, DIA).top10;
-  assert.ok(t.linhas.length >= 10);
+  assert.equal(t.linhas.length, 10, 'com desempate o Top 10 tem exatamente 10 linhas');
+  assert.deepEqual(t.linhas.map((l) => l.top), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'posições únicas, sem repetir');
   const totais = t.linhas.map((l) => l.m.total);
   assert.deepEqual(totais, [...totais].sort((a, b) => b - a), 'ordenado por Total Negociações decrescente');
   assert.ok(t.linhas.every((l) => l.top >= 1 && l.top < 11));
@@ -346,24 +348,39 @@ test('matriz Comercial: sem Manutenção, sem recursos sem setor e só serviços
   assert.deepEqual(m.opcoes.frentes, ['Leitura', 'Manutenção']);
 });
 
-test('Top 10: ranking denso por total*0,15 + valor*0,0000001, retira os recursos D11..., total > 0 e Top < 11', () => {
+test('Top 10: ranking por total*0,15 + valor*0,0000001, retira os recursos D11..., total > 0 e Top < 11', () => {
   const linhas = [];
   // recurso i tem (13 - i) negociações; os recursos 11 e 12 ficam fora do Top 10
   for (let i = 1; i <= 12; i++) for (let j = 0; j < 13 - i; j++) linhas.push(atv({ mat: i + '-' + j, recurso: 'RIOLTRIN-' + String(i).padStart(3, '0') }));
-  // empate exato (mesma quantidade e mesmo valor) divide a posição
+  // empate exato (mesma quantidade e mesmo valor): desempata, não divide a posição
   linhas.push(atv({ mat: 'e1', recurso: 'RIOLTRIN-020' }), atv({ mat: 'e2', recurso: 'RIOLTRIN-021' }));
   const m = modelo(linhas);
   const t = N.calcular(m, {}).top10;
-  assert.ok(t.linhas.length >= 10);
+  assert.equal(t.linhas.length, 10);
   assert.equal(t.linhas[0].rotulo, 'RIOLTRIN-001');
   assert.equal(t.linhas[0].top, 1);
   assert.ok(t.linhas.every((l) => l.top < 11 && l.m.total > 0));
-  const ranks = N.rankingDenso([5, 3, 3, null, 1]);
-  assert.deepEqual(ranks, [1, 2, 2, 4, 3]);
   // desempate pelo valor (0,0000001 por real): mais valor, melhor posição
   const m2 = modelo([atv({ mat: 'a', recurso: 'RIOLTRIN-001', val: fixo(10) }), atv({ mat: 'b', recurso: 'RIOLTRIN-002', val: fixo(900) })]);
   const t2 = N.calcular(m2, {}).top10.linhas;
   assert.deepEqual(t2.map((l) => [l.rotulo, l.top]), [['RIOLTRIN-002', 1], ['RIOLTRIN-001', 2]], 'mesma quantidade: a tabela segue a posição do ranking');
+});
+
+test('Top 10: desempate quando quantidade e valor são iguais — negociou por último primeiro, depois ordem alfabética', () => {
+  const item = (criterio, ultima, rotulo) => ({ criterio, ultima, rotulo });
+  const pos = N.posicoesDoRanking([item(5, '2026-09-01', 'A'), item(3, '2026-09-02', 'B'), item(3, '2026-09-05', 'C'), item(null, '', 'D'), item(3, '2026-09-05', 'AA')]);
+  assert.deepEqual(pos, [1, 4, 3, 5, 2], 'A=1; entre os de critério 3: AA e C (05/09, nome) antes de B (02/09); sem critério por último');
+  // 12 recursos com a mesma quantidade e o mesmo valor: só 10 entram, e a data decide quem fica de fora
+  const linhas = [];
+  for (let i = 1; i <= 12; i++) linhas.push(atv({ mat: 'm' + i, recurso: 'RIOLTRIN-' + String(i).padStart(3, '0'), data: '2026-09-' + String(i).padStart(2, '0') }));
+  const t = N.calcular(modelo(linhas), {}).top10.linhas;
+  assert.equal(t.length, 10);
+  assert.deepEqual(t.map((l) => l.top), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(t.map((l) => l.rotulo), Array.from({ length: 10 }, (_, k) => 'RIOLTRIN-' + String(12 - k).padStart(3, '0')), 'os 10 mais recentes, do mais novo para o mais antigo');
+  // mesma data: pelo nome do recurso
+  const iguais = Array.from({ length: 12 }, (_, i) => atv({ mat: 'n' + i, recurso: 'RIOLTRIN-' + String(i + 1).padStart(3, '0') }));
+  const t2 = N.calcular(modelo(iguais), {}).top10.linhas;
+  assert.deepEqual(t2.map((l) => l.rotulo), Array.from({ length: 10 }, (_, k) => 'RIOLTRIN-' + String(k + 1).padStart(3, '0')));
 });
 
 test('Top 10 retira os cinco recursos da lista de exclusão (sem diferenciar maiúsculas)', () => {
@@ -485,4 +502,17 @@ test('relatório com todas as colunas obrigatórias presentes e opcionais ausent
   assert.deepEqual(r.avisos, []);
   assert.equal(r.stats.linhas, 141);
   assert.equal(r.stats.semData, 0);
+});
+
+test('rótulos do Motivo da não Execução: tudo em maiúsculas vira texto legível e quebra sem cortar palavra', () => {
+  assert.equal(Formato.legivel('DUPLICIDADE DE MATRÍCULA'), 'Duplicidade de Matrícula');
+  assert.equal(Formato.legivel('RETORNAR DEPOIS'), 'Retornar Depois');
+  assert.equal(Formato.legivel('Cliente ausente'), 'Cliente ausente', 'texto já legível não muda');
+  assert.equal(Formato.legivel('123'), '123', 'sem letras: não muda');
+  assert.deepEqual(Formato.quebrar('Duplicidade de Matrícula'), ['Duplicidade de', 'Matrícula']);
+  assert.deepEqual(Formato.quebrar('Retornar Depois'), ['Retornar Depois']);
+  const longo = Formato.quebrar('um dois tres quatro cinco seis sete oito nove dez onze doze treze', 10);
+  assert.equal(longo.length, 3, 'no máximo 3 linhas');
+  assert.ok(longo[2].endsWith('…'), 'o que passar vira reticências');
+  assert.deepEqual(Formato.quebrar(''), []);
 });

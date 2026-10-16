@@ -450,7 +450,7 @@ export default function NegociacoesClient() {
           ))}
         </section>
 
-        <section aria-label="Detalhamento" className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1.05fr_1.05fr]">
+        <section aria-label="Detalhamento" className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <Painel id="comercial" titulo="Negociações Comercial">
             {visao && visao.comercial.linhas.length ? (
               <ComercialTabela

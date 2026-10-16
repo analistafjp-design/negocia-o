@@ -18,6 +18,11 @@ Hospedagem: **GitHub Pages**.
 - O cabeçalho mostra **só o nome "Negociação"** e **o botão Conectar pasta existe uma vez só, no cabeçalho**
   (pedidos do usuário, 16/10/2026): não recoloque subtítulo, selo, os quatro quadrinhos de apresentação nem
   um cartão com outro botão no corpo da página.
+- **Painéis de baixo** (pedido do usuário, 16/10/2026: "melhorar esses visuais… fácil de ler e não fuja tanto do
+  original"): duas linhas (Negociações Comercial + Top 10; Negociação x Cidade + Motivo), **sem rolagem interna**
+  (o Total fica sempre no pé da tabela), recurso do Top 10 numa linha só, seta ▼ em "Neg. Total" (a cidade é
+  ordenada por valor), linhas alternadas suaves e rótulo do Motivo legível (`legivel`/`quebrar`, `lib/formato.ts`).
+  Cada painel tem a altura do próprio conteúdo (esticar deixava vazios enormes). Não recoloque rolagem interna.
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.
@@ -58,6 +63,9 @@ Hospedagem: **GitHub Pages**.
 ## Pendências para confirmar com a base real
 
 1. Desdobro × matrícula: aqui só se amarra à matrícula com filtro de atividade (explica o 131 × 132 do print).
-2. Coluna "Top" do Top 10: o print não segue estritamente a fórmula documentada do ranking.
+2. Coluna "Top" do Top 10: o print não segue estritamente a fórmula documentada do ranking. **Desempate pedido pelo
+   usuário (16/10/2026)**: mesma quantidade e valor → quem negociou por último; depois, ordem alfabética do
+   recurso (`posicoesDoRanking`, `lib/medidas.ts`). O Top 10 tem no máximo 10 linhas, com posições únicas — é uma
+   divergência consciente do Power BI (que divide a posição entre empatados); não volte ao ranking denso sem pedido.
 3. `Text.BeforeDelimiter` sem hífen no recurso: tratado como vazio (sem setor), a atividade sai.
 4. Atividades repetidas entre arquivos não são removidas (o relatório também não); o aviso mostra quantas.

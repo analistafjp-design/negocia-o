@@ -52,8 +52,11 @@ As medidas foram portadas do relatório `Report Negociações Acumulado` (`lib/m
 - Só entram atividades de recursos com setor no cadastro de recursos (`RIOLTRIN` → Leitura etc.); a tabela de
   desdobros não tem esse corte, como no relatório.
 - **Negociações Comercial** só traz serviços do setor `COMERCIAL` e tira a frente Manutenção. **Top 10**:
-  setor Comercial, sem os recursos `D11…/D12…/D13.1…` da lista de exclusão, `Ranking < 11` (denso, por
-  `total × 0,15 + valor × 0,0000001`) e `Total > 0`.
+  setor Comercial, sem os recursos `D11…/D12…/D13.1…` da lista de exclusão, `Ranking < 11` (por
+  `total × 0,15 + valor × 0,0000001`) e `Total > 0`. **Com desempate** (pedido do usuário, 16/10/2026; o Power BI
+  divide a posição entre empatados e o Top 10 passava de 10 linhas): mesma quantidade e mesmo valor, vale quem
+  negociou por último e, ainda empatado, a ordem alfabética do recurso. O Top 10 tem sempre até 10 linhas, com
+  posições 1 a 10 sem repetir.
 - **Motivo da não Execução**: cobrança com `Negociou ≠ SIM`; vale o motivo *Normal* quando existe, senão o de
   *Cobrança*; fora vazio e `SUSPENSO`.
 - Comparações **não diferenciam maiúsculas de minúsculas** (como o DAX) e textos que só diferem nisso viram um só.
@@ -69,7 +72,7 @@ Estes dois vieram da leitura da extração e do print, sem dados reais para conf
    Data/Mês conta todos os desdobros do período. É a leitura que reproduz o print: **132** nos cartões e no total
    de cidades, e **131** na soma das cidades e na matriz Comercial (um desdobro sem atividade da mesma matrícula).
 2. **Coluna "Top".** Com os números do print, a fórmula do ranking documentada daria outra ordem em
-   `RIOLTRIN-009`/`-023` e não empataria `-001`/`-027`. O painel segue a fórmula documentada.
+   `RIOLTRIN-009`/`-023`. O painel segue a fórmula documentada e, desde 16/10/2026, desempata os iguais (acima).
 
 ## Desenvolvimento
 
