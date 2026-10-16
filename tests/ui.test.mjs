@@ -175,16 +175,17 @@ test('Top 10 e Motivo da não Execução', async () => {
   await page.context().close();
 });
 
-test('painéis de baixo: duas linhas, sem rolagem interna, Total à vista e recurso numa linha só', async () => {
+test('painéis de baixo: matriz à esquerda, Top 10 e Motivo à direita, Cidade em largura total, sem rolagem interna e com o Total à vista', async () => {
   const page = await abrir({ w: 1440, h: 900 });
   await carregarPrint(page);
   await filtrarDiaDoPrint(page);
   const caixa = (id) => page.locator(`[data-painel="${id}"]`).boundingBox();
   const [com, top, cid, mot] = await Promise.all(['comercial', 'top10', 'cidade', 'motivo'].map(caixa));
-  assert.ok(Math.abs(com.y - top.y) < 2, 'Negociações Comercial e Top 10 na mesma linha');
-  assert.ok(Math.abs(cid.y - mot.y) < 2, 'Negociação x Cidade e Motivo na mesma linha');
-  assert.ok(cid.y >= com.y + com.height - 1, 'a segunda linha vem abaixo da primeira');
-  assert.ok(com.width > top.width && cid.width > mot.width, 'a tabela fica mais larga que o painel ao lado');
+  assert.ok(com.x < top.x, 'matriz Comercial à esquerda dos gráficos');
+  assert.ok(Math.abs(com.y - top.y) < 2, 'matriz Comercial e Top 10 começam na mesma altura');
+  assert.ok(top.y + top.height <= mot.y && Math.abs(top.x - mot.x) < 2, 'Motivo logo abaixo do Top 10, alinhado a ele');
+  assert.ok(cid.y >= Math.max(com.y + com.height, mot.y + mot.height) - 1, 'Negociação x Cidade abaixo de tudo');
+  assert.ok(Math.abs(cid.x - com.x) < 2 && Math.abs(cid.x + cid.width - (top.x + top.width)) < 2, 'Negociação x Cidade na largura toda');
   for (const id of ['comercial', 'top10', 'cidade', 'motivo']) {
     const sobra = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollHeight - el.clientHeight);
     assert.ok(sobra <= 1, 'rolagem interna em ' + id + ': ' + sobra + 'px');
@@ -194,13 +195,37 @@ test('painéis de baixo: duas linhas, sem rolagem interna, Total à vista e recu
     const total = await page.locator(`[data-painel="${id}"] [data-total="neg"]`).boundingBox();
     assert.ok(total.y + total.height <= painel.y + painel.height + 1, 'Total de ' + id + ' dentro do painel, sem rolar');
   }
-  const alturas = await page.locator('[data-painel="top10"] tbody tr td:first-child').evaluateAll((tds) => tds.map((td) => td.getBoundingClientRect().height));
-  assert.ok(alturas.length >= 10 && alturas.every((h) => h < 44), 'recurso do Top 10 numa linha só: ' + alturas.join(','));
-  assert.equal(await page.locator('[data-painel="cidade"] th[aria-sort="descending"]').count(), 1, 'cabeçalho Neg. Total marca a ordenação');
-  assert.match(limpa(await page.textContent('[data-painel="cidade"] th[aria-sort="descending"]')), /Neg\. Total/);
-  await page.locator('[data-painel="motivo"] svg text:has(> title) tspan').first().waitFor();
+  assert.equal(await page.locator('[data-dica-rolagem]').count(), 0, 'em tela larga o gráfico cabe: sem aviso de rolagem');
   const rotulo = (await page.locator('[data-painel="motivo"] svg text:has(> title) tspan').allTextContents()).join(' ');
   assert.equal(rotulo, 'Duplicidade de Matrícula', 'rótulo do motivo legível, sem caixa alta');
+  semErros(page);
+  await page.context().close();
+});
+
+test('Top 10 e Negociação x Cidade: colunas + linha com rótulos, cada um num tom de cor', async () => {
+  const page = await abrir({ w: 1440, h: 900 });
+  await carregarPrint(page);
+  await filtrarDiaDoPrint(page);
+  for (const [painel, graf] of [['top10', 'top10'], ['cidade', 'cidades']]) {
+    const g = `[data-painel="${painel}"] [data-grafico="${graf}"]`;
+    await page.locator(g + ' .recharts-bar-rectangle').first().waitFor();
+    const linhas = await page.locator(`[data-painel="${painel}"] tbody tr`).count();
+    assert.equal(await page.locator(g + ' .recharts-bar-rectangle').count(), linhas, 'uma coluna por linha de ' + painel);
+    assert.equal(await page.locator(g + ' .recharts-line-dots circle').count(), linhas, 'um ponto da linha por linha de ' + painel);
+    const textos = (await page.locator(g + ' svg text').allTextContents()).map(limpa);
+    for (const rot of await page.locator(`[data-painel="${painel}"] tbody tr`).evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-linha')))) {
+      assert.ok(textos.includes(rot), 'nome no eixo: ' + rot);
+    }
+    assert.ok(textos.some((t) => /^\d[\d.,]*( mil)?$/.test(t)), 'há rótulos de dados nas colunas e na linha');
+  }
+  // tons diferentes: Top 10 em azul e Cidade em verde-água
+  const preenchimento = (graf) => page.locator(`[data-grafico="${graf}"] .recharts-bar-rectangle path`).first().evaluate((el) => getComputedStyle(el).fill);
+  assert.equal(await preenchimento('top10'), 'rgb(80, 104, 221)');
+  assert.equal(await preenchimento('cidades'), 'rgb(74, 166, 160)');
+  // o balão traz os números exatos
+  await page.locator('[data-grafico="top10"] .recharts-bar-rectangle').first().hover();
+  await page.getByText(/^Top 1 · /).waitFor();
+  assert.match(limpa(await page.locator('[data-painel="top10"] .bg-popover').first().textContent()), /R\$ [\d.]+,\d\d/);
   semErros(page);
   await page.context().close();
 });
@@ -283,6 +308,7 @@ test('celular (390 px): sem rolagem lateral e cartões legíveis', async () => {
     const lateral = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollWidth - el.clientWidth);
     assert.ok(lateral <= 1, 'rolagem lateral dentro de ' + id + ': ' + lateral + 'px');
   }
+  assert.equal(await page.locator('[data-painel="top10"] [data-dica-rolagem], [data-painel="cidade"] [data-dica-rolagem]').count(), 2, 'no celular os gráficos rolam para o lado e avisam');
   assert.equal(await kpi(page, 'total'), '132');
   semErros(page);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'celular.png'), fullPage: true });

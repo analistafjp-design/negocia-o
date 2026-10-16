@@ -41,6 +41,12 @@
   --marca-linha: #cddbf8;
   --tabela: #f1f4fb;
   --tabela-texto: #3b4a72;
+
+  /* Gráficos de colunas + linha: Top 10 em azul, Negociação x Cidade em verde-água, para não se confundirem. */
+  --serie-top: #5068dd;
+  --serie-top-linha: #14296b;
+  --serie-cidade: #4aa6a0;
+  --serie-cidade-linha: #0e5a60;
 }
 
 @theme inline {

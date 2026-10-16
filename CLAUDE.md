@@ -18,11 +18,18 @@ Hospedagem: **GitHub Pages**.
 - O cabeçalho mostra **só o nome "Negociação"** e **o botão Conectar pasta existe uma vez só, no cabeçalho**
   (pedidos do usuário, 16/10/2026): não recoloque subtítulo, selo, os quatro quadrinhos de apresentação nem
   um cartão com outro botão no corpo da página.
-- **Painéis de baixo** (pedido do usuário, 16/10/2026: "melhorar esses visuais… fácil de ler e não fuja tanto do
-  original"): duas linhas (Negociações Comercial + Top 10; Negociação x Cidade + Motivo), **sem rolagem interna**
-  (o Total fica sempre no pé da tabela), recurso do Top 10 numa linha só, seta ▼ em "Neg. Total" (a cidade é
-  ordenada por valor), linhas alternadas suaves e rótulo do Motivo legível (`legivel`/`quebrar`, `lib/formato.ts`).
-  Cada painel tem a altura do próprio conteúdo (esticar deixava vazios enormes). Não recoloque rolagem interna.
+- **Painéis de baixo** (pedidos do usuário, 16/10/2026): a matriz **Negociações Comercial** fica à esquerda e, à
+  direita, **Top 10** e **Motivo da não Execução**; **Negociação x Cidade** ocupa a **largura toda** embaixo. No
+  celular tudo empilha (Comercial, Top 10, Cidade, Motivo). **Sem rolagem interna** (o Total fica no pé de cada
+  painel). **Top 10 e Cidade são gráficos de colunas + linha com rótulos de dados** (`components/graficos-negociacoes.tsx`,
+  Recharts), cada um num tom: Top 10 em azul (`--serie-top*`) e Cidade em verde-água (`--serie-cidade*`), tokens em
+  `app/globals.css`. Top 10: colunas = quantidade, linha = valor (R$). Cidade (ordenada por valor): colunas = valor,
+  linha = quantidade. Rótulos de valor abreviados ("14,9 mil", `fmtMil`); o balão traz os números exatos, o Total
+  (`data-total`) fica numa faixa sob o gráfico e uma tabela escondida (`sr-only`) leva os mesmos números para leitor de
+  tela e para os testes. Os dois eixos têm 5 divisões (`escalaDoEixo`, `lib/eixo.ts`). Em tela estreita o gráfico tem
+  largura mínima e rola para o lado **dentro do painel**, com aviso. A matriz ainda é a tabela; o usuário viu modelos
+  A/B/C dela e não escolheu. Não recoloque rolagem interna nem as tabelas de Top 10 e Cidade sem ele pedir.
+  O rótulo do Motivo é legível (`legivel`/`quebrar`, `lib/formato.ts`).
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.

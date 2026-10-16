@@ -14,6 +14,10 @@ export const fmtR0 = (v: number | null): string => (v === null ? VAZIO : brl0.fo
 /** Valor em reais com centavos (tabelas). `v` em milésimos de centavo. */
 export const fmtR2 = (v: number | null): string => (v === null ? VAZIO : brl2.format(reais(v) as number));
 
+const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+/** Valor abreviado para rótulo de gráfico: 14900 -> "14,9 mil"; abaixo de mil, o número inteiro. */
+export const fmtMil = (n: number): string => (Math.abs(n) >= 1000 ? nf1.format(n / 1000) + " mil" : nf.format(Math.round(n)));
+
 export const plural = (n: number, um: string, varios: string): string => (n === 1 ? um : varios);
 const pad2 = (n: number): string => (n < 10 ? "0" + n : "" + n);
 export const hhmmss = (d: Date): string => pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
