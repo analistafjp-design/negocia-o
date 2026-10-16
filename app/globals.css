@@ -42,6 +42,9 @@
   --tabela: #f1f4fb;
   --tabela-texto: #3b4a72;
 
+  /* Fios da árvore da matriz Negociações Comercial. */
+  --arvore-fio: #9fb1e0;
+
   /* Gráficos de colunas + linha: Top 10 em azul, Negociação x Cidade em verde-água, para não se confundirem. */
   --serie-top: #5068dd;
   --serie-top-linha: #14296b;
@@ -121,4 +124,80 @@ button {
 
 .kpi-valor {
   font-variant-numeric: tabular-nums;
+}
+
+/* Árvore da matriz Negociações Comercial. Abaixo de 1280 px ela empilha, com recuo e um fio à esquerda;
+   a partir de 1280 px abre para o lado (raiz, clusters, frentes e recursos), ligada por fios. */
+.arv,
+.arv-kids {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.arv-kids {
+  margin: 2px 0 0 12px;
+  padding-left: 16px;
+  border-left: 2px solid var(--arvore-fio);
+}
+.arv-k {
+  position: relative;
+  padding: 4px 0;
+}
+.arv-kids > .arv-k::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 26px;
+  width: 16px;
+  border-top: 2px solid var(--arvore-fio);
+}
+.arv-raiz > .arv-k {
+  padding: 0;
+}
+@media (min-width: 1280px) {
+  .arv-k {
+    display: flex;
+    align-items: center;
+  }
+  .arv-kids {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 0 30px;
+    padding-left: 0;
+    border-left: 0;
+  }
+  .arv-kids::before {
+    content: "";
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    width: 30px;
+    border-top: 2px solid var(--arvore-fio);
+  }
+  .arv-kids > .arv-k {
+    padding: 4px 0 4px 30px;
+  }
+  .arv-kids > .arv-k::before {
+    left: 0;
+    top: 50%;
+    width: 30px;
+  }
+  .arv-kids > .arv-k::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid var(--arvore-fio);
+  }
+  .arv-kids > .arv-k:first-child::after {
+    top: 50%;
+  }
+  .arv-kids > .arv-k:last-child::after {
+    bottom: 50%;
+  }
+  .arv-kids > .arv-k:only-child::after {
+    display: none;
+  }
 }

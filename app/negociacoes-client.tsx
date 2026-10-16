@@ -11,7 +11,7 @@ import { KpiCard } from "@/components/kpi-card";
 import { MotivoChart } from "@/components/motivo-chart";
 import { Painel, Vazio } from "@/components/painel";
 import { CidadeGrafico, TopGrafico } from "@/components/graficos-negociacoes";
-import { ComercialTabela } from "@/components/tabelas-negociacoes";
+import { ComercialArvore } from "@/components/arvore-comercial";
 import { FILTROS_VAZIOS, datasDisponiveis, sanitizarFiltros } from "@/lib/filtros";
 import { fmtData, fmtMes, fmtQtd, fmtR0, hhmmss, plural, VAZIO } from "@/lib/formato";
 import {
@@ -455,7 +455,7 @@ export default function NegociacoesClient() {
         <section aria-label="Detalhamento" className="grid grid-cols-[minmax(0,1fr)] gap-4">
           <Painel id="comercial" titulo="Negociações Comercial">
             {visao && visao.comercial.linhas.length ? (
-              <ComercialTabela
+              <ComercialArvore
                 linhas={visao.comercial.linhas}
                 total={visao.comercial.total}
                 aberto={aberto}

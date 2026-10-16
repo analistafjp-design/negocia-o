@@ -14,7 +14,7 @@ Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho az
 | Filtros | Frente de serviço, Cluster, Mês/ano e Data (abre no mês mais recente) |
 | Cartões de quantidade | Negociação Principal · Cadastro Desdobro · Negociação Corte · Negociação Desdobro · Negociação Pós Corte · **Total Negociações** |
 | Cartões de valor | Negociação Principal $ · $ Desdobro Corte · $ Desdobro · $ Desdobro Pós Corte · **Negociação Tot $** |
-| Negociações Comercial | Cluster Perfil › frente de serviço › recurso (linhas que abrem e fecham), com total |
+| Negociações Comercial | Árvore Total › Cluster Perfil › frente de serviço › recurso (o + abre e o − fecha); abre para o lado em tela larga e empilha no celular |
 | Top 10 Negociações | Gráfico de colunas (quantidade) e linha (valor), por recurso, na ordem do ranking |
 | Negociação x Cidade | Gráfico de colunas (valor) e linha (quantidade), por cidade |
 | Motivo da não Execução | Cobranças sem negociação, por motivo |
