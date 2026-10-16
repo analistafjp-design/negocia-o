@@ -8,7 +8,7 @@ export function KpiCard({ id, rotulo, valor, destaque }: { id: string; rotulo: s
   return (
     <Card
       data-kpi={id}
-      className={cn("gap-0 py-3.5 shadow-sm", destaque && "border-transparent bg-gradient-to-br from-[#3d444d] to-[#4a525c] text-white")}
+      className={cn("gap-0 py-3.5 shadow-sm", destaque && "border-transparent bg-gradient-to-br from-marca-media to-marca text-white")}
     >
       <CardContent className="px-4">
         <p className={cn("text-xs leading-snug font-semibold", destaque ? "text-white/75" : "text-muted-foreground")}>{rotulo}</p>
@@ -17,7 +17,7 @@ export function KpiCard({ id, rotulo, valor, destaque }: { id: string; rotulo: s
           title={vazio ? "Sem registros no período" : undefined}
           className={cn(
             "kpi-valor mt-1.5 text-[clamp(1.5rem,2.1vw,1.9rem)] leading-tight font-bold tracking-tight break-words",
-            vazio && (destaque ? "text-white/55" : "text-[#a3aab3]")
+            vazio && (destaque ? "text-white/55" : "text-[#a9b4cc]")
           )}
         >
           {valor}

@@ -5,7 +5,7 @@ web do relatório *Negociações* do Power BI: mesmos cartões, mesmas regras de
 planilhas direto da pasta, no navegador. Nenhum dado sai do computador.
 
 Mesma base técnica do Painel Executivo: **TypeScript, Next.js (export estático), React, Tailwind, shadcn/ui e
-Recharts**. A cor é neutra (grafite), para se distinguir dos outros painéis.
+Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho azul-marinho), definida nos tokens `--marca*` de `app/globals.css`.
 
 ## O que a tela mostra
 
