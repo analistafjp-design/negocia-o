@@ -231,6 +231,71 @@ def casos(saida):
     (saida / "corrompido.xlsx").write_bytes(b"isto nao e um xlsx")
 
 
+CAB_ARRECADACAO = [
+    "Nº Ligação", "Nº Nota", "Mês", "Ano", "Valor Pago", "Vencimento", "Data Pagto.", "Data Atualiz.", "Data Crédito",
+    "Val. Autenticado", "Utilização (Sub. Categ.)", "Zona (Localidade)", "Classificação", "Nº Contrato", "Cliente",
+    "Tipo Fatura", "Situação Pagto", "Banco", "Tipo Pagamento",
+]
+
+
+def linha_arrecadacao(mat, valor, pago, venc, tipo="3-PARCELA", situacao="Quitada", nota=0, cliente=None):
+    """Uma linha do CSV de arrecadação (dd/mm/aaaa; valores no padrão brasileiro). Clientes e valores são inventados."""
+    return [
+        str(mat), str(nota), venc[3:5], venc[6:], valor, venc, pago, pago, pago, valor, "RESIDENCIAL", "ZONA TESTE", "A",
+        "0", cliente or "CLIENTE JOSÉ DE TESTE %s" % mat, tipo, situacao, "BANCO TESTE", "ARRECADAÇÃO",
+    ]
+
+
+def escrever_csv(caminho, linhas, codificacao, delimitador=";", quebra="\r\n", bom=False):
+    texto = quebra.join(delimitador.join(c) for c in linhas) + quebra
+    with open(caminho, "w", encoding=codificacao, newline="") as f:
+        f.write(("\ufeff" if bom else "") + texto)
+
+
+def montar_arrecadacao(saida):
+    """
+    CSV de arrecadação SINTÉTICOS ligados às matrículas do print (100001, 100002 e 100064 têm negociação em 29/09/2026;
+    8888801 não tem nenhuma). A acumulada sai em Windows-1252, a diária em UTF-8 com BOM e repete dois pagamentos dela. Os nomes dos arquivos
+    não têm acento: o Chromium do CI não anexa arquivo com acento no nome quando o sistema está sem UTF-8.
+    """
+    saida.mkdir(parents=True, exist_ok=True)
+    acumulada = [
+        CAB_ARRECADACAO,
+        linha_arrecadacao(100001, "100,00", "29/09/2026", "10/10/2026"),  # no dia da negociação: conta
+        linha_arrecadacao(100001, "150,00", "05/10/2026", "10/11/2026"),
+        linha_arrecadacao(100001, "999,00", "28/09/2026", "10/09/2026"),  # antes da negociação: não conta
+        linha_arrecadacao(100001, "80,00", "01/10/2026", "10/10/2026", tipo="1-NOTA FISCAL MENSAL", nota=55501),  # fatura mensal: fora
+        linha_arrecadacao(100001, "70,00", "02/10/2026", "10/10/2026", situacao="Cancelada"),  # não quitada: fora
+        linha_arrecadacao(100064, "1.234,56", "30/09/2026", "10/10/2026"),
+        linha_arrecadacao(8888801, "500,00", "30/09/2026", "10/10/2026"),  # matrícula sem negociação: só no resumo
+    ]
+    diaria = [
+        CAB_ARRECADACAO,
+        linha_arrecadacao(100001, "100,00", "29/09/2026", "10/10/2026"),  # repete a acumulada: conta uma vez
+        linha_arrecadacao(100001, "150,00", "05/10/2026", "10/11/2026"),  # idem
+        linha_arrecadacao(100001, "50,00", "06/10/2026", "10/12/2026"),
+        linha_arrecadacao(100002, "20,00", "03/10/2026", "10/10/2026"),  # dois pagamentos iguais no mesmo arquivo: valem os dois
+        linha_arrecadacao(100002, "20,00", "03/10/2026", "10/10/2026"),
+    ]
+    escrever_csv(saida / "arrecadacao_acumulada.csv", acumulada, "cp1252")
+    escrever_csv(saida / "arrecadacao_diaria.csv", diaria, "utf-8", quebra="\n", bom=True)
+
+
+def casos_arrecadacao(saida):
+    # vírgula como separador, campos entre aspas (com vírgula e aspas dentro), colunas em outra ordem, datas ISO e BR
+    com_aspas = [
+        ['"Cliente"', '"Nº Ligação"', '"Tipo Fatura"', '"Situação Pagto"', '"Data Pagto."', '"Valor Pago"'],
+        ['"SILVA, JOSÉ"', '"555001"', '"3-PARCELA"', '"Quitada"', '"2026-10-02"', '"1234.56"'],
+        ['"MARIA ""M"" SOUZA"', '"0555002"', '"3-PARCELA"', '"Quitada"', '"02/10/2026"', '"R$ 100,00"'],
+        ['"OUTRO"', '"555003"', '"1-NOTA FISCAL MENSAL"', '"Quitada"', '"2026-10-02"', '"10.00"'],
+    ]
+    escrever_csv(saida / "arrecadacao_virgula_aspas.csv", com_aspas, "utf-8", delimitador=",", quebra="\n")
+    # falta a coluna Valor Pago
+    escrever_csv(saida / "arrecadacao_sem_valor.csv", [["Nº Ligação", "Data Pagto.", "Tipo Fatura", "Situação Pagto"], ["1", "02/10/2026", "3-PARCELA", "Quitada"]], "cp1252")
+    # não é arrecadação
+    escrever_csv(saida / "arrecadacao_outro_assunto.csv", [["produto", "preco"], ["a", "1,00"]], "utf-8")
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -242,6 +307,8 @@ def main():
     escrever_atividades(pasta / "Report Atividade 2026-09-29.xlsx", L.atv)
     escrever_cluster(pasta / "Cluster_2026-09.xlsx", L.cluster)
     casos(saida / "casos")
+    montar_arrecadacao(saida / "arrecadacao")
+    casos_arrecadacao(saida / "casos")
     print("gerado em", saida, "-", len(L.atv), "linhas de atividade,", len(L.cluster), "matrículas no cluster")
 
 

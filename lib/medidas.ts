@@ -32,9 +32,11 @@ export function medidas(a: readonly Atividade[], d: readonly Desdobro[]): Medida
   let pN = 0;
   let pS = 0;
   let pV = 0;
+  let pA = 0; // arrecadado das negociações principais
   for (const r of a) {
     if (!r.cob || !r.sim) continue; // Categoria 12 = COBRANÇA e Negociou O Débito? = SIM
     pN++;
+    pA += r.arr;
     if (r.val !== null) {
       pS += r.val;
       pV++;
@@ -44,23 +46,26 @@ export function medidas(a: readonly Atividade[], d: readonly Desdobro[]): Medida
   const cnt = [[0, 0, 0], [0, 0, 0]];
   const sum = [[0, 0, 0], [0, 0, 0]];
   const nv = [[0, 0, 0], [0, 0, 0]];
+  const arr = [[0, 0, 0], [0, 0, 0]]; // arrecadado, nos mesmos recortes
   let cad = 0;
-  const acumula = (i: number, j: number, v: number | null): void => {
+  const acumula = (i: number, j: number, x: Desdobro): void => {
     cnt[i][j]++;
-    if (v !== null) {
-      sum[i][j] += v;
+    arr[i][j] += x.arr;
+    if (x.val !== null) {
+      sum[i][j] += x.val;
       nv[i][j]++;
     }
   };
   for (const x of d) {
     if (x.i >= 0) {
-      acumula(x.i, 0, x.val);
-      if (x.k === K_CORTE) acumula(x.i, 1, x.val);
-      else if (x.k === K_POS) acumula(x.i, 2, x.val);
+      acumula(x.i, 0, x);
+      if (x.k === K_CORTE) acumula(x.i, 1, x);
+      else if (x.k === K_POS) acumula(x.i, 2, x);
     } else if (x.cad && (x.k === K_COBRANCA || x.k === K_CORTE)) cad++;
   }
   const contar = (j: number): number | null => add(nz(cnt[0][j]), nz(cnt[1][j]));
   const somar = (j: number): number | null => add(soma(sum[0][j], nv[0][j]), soma(sum[1][j], nv[1][j]));
+  const arrecadar = (j: number): number | null => add(soma(arr[0][j], cnt[0][j]), soma(arr[1][j], cnt[1][j])); // BLANK só sem negociações
   const principal = nz(pN);
   const negDesdobro = contar(0); // Neegociação Desdobro
   const corte = contar(1);
@@ -69,6 +74,11 @@ export function medidas(a: readonly Atividade[], d: readonly Desdobro[]): Medida
   const valCorte = somar(1);
   const valPos = somar(2);
   const valDesdobro = sub(sub(somar(0), valPos), valCorte); // Negocição $ Desdobro
+  // Arrecadado real: a mesma conta dos valores negociados, sobre o que foi pago de cada negociação
+  const arrPrincipal = soma(pA, pN);
+  const arrCorte = arrecadar(1);
+  const arrPos = arrecadar(2);
+  const arrDesdobro = sub(sub(arrecadar(0), arrPos), arrCorte);
   return {
     principal,
     cadastro: nz(cad),
@@ -81,6 +91,11 @@ export function medidas(a: readonly Atividade[], d: readonly Desdobro[]): Medida
     valDesdobro,
     valPos,
     valTotal: add(add(add(valDesdobro, valPos), valCorte), valPrincipal),
+    arrPrincipal,
+    arrCorte,
+    arrDesdobro,
+    arrPos,
+    arrTotal: add(add(add(arrDesdobro, arrPos), arrCorte), arrPrincipal),
   };
 }
 
@@ -249,7 +264,10 @@ export function calcular(modelo: Modelo, f: Partial<Filtros> = {}): Visao {
     const m = medidas(g.a, desdobrosDe(g.mats, porMat));
     if (!vazia(m)) cidades.push({ rotulo: cid || "(em branco)", m });
   }
-  cidades.sort((x, y) => (y.m.valTotal || 0) - (x.m.valTotal || 0) || (y.m.total || 0) - (x.m.total || 0) || x.rotulo.localeCompare(y.rotulo, "pt-BR"));
+  // Com arrecadação o gráfico mostra o arrecadado nas colunas: a ordem acompanha (maior primeiro); sem ela, o negociado.
+  const temArr = modelo.arrecadacao !== null;
+  const valorDe = (m: Medidas): number => (temArr ? m.arrTotal : m.valTotal) || 0;
+  cidades.sort((x, y) => valorDe(y.m) - valorDe(x.m) || (y.m.valTotal || 0) - (x.m.valTotal || 0) || (y.m.total || 0) - (x.m.total || 0) || x.rotulo.localeCompare(y.rotulo, "pt-BR"));
 
   // Motivo da não Execução: cobrança sem negociação, por motivo (menos vazio e SUSPENSO)
   const mot = new Map<string, number>();
@@ -261,5 +279,5 @@ export function calcular(modelo: Modelo, f: Partial<Filtros> = {}): Visao {
     .map(([rotulo, qtd]) => ({ rotulo, qtd }))
     .sort((x, y) => y.qtd - x.qtd || x.rotulo.localeCompare(y.rotulo, "pt-BR"));
 
-  return { cards, comercial, top10, cidades: { linhas: cidades, total: cards }, motivos };
+  return { temArr, cards, comercial, top10, cidades: { linhas: cidades, total: cards }, motivos };
 }

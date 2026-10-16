@@ -1,9 +1,10 @@
 // Fontes de dados no navegador: pasta (acesso contínuo pela File System Access API) ou arquivos escolhidos,
 // com os resultados já lidos guardados no IndexedDB para não reler tudo a cada atualização.
 // Nada daqui envia dados para fora do computador.
+import { lerArrecadacao } from "./arrecadacao-csv.ts";
 import { NegError, PARSER_VERSION, lerArquivo } from "./leitura.ts";
 import { consolidar } from "./modelo.ts";
-import type { Modelo, ResultadoArquivo, ResultadoAtividades, ResultadoCluster, ResultadoIgnorado } from "./tipos.ts";
+import type { Modelo, ResultadoArquivo, ResultadoArrecadacao, ResultadoAtividades, ResultadoCluster, ResultadoIgnorado } from "./tipos.ts";
 
 /** Um arquivo candidato: nome, caminho relativo e acesso ao `File`. */
 export interface Entrada {
@@ -150,6 +151,7 @@ export interface RelatorioCarga {
   ignoradosFormato: string[];
   atividades: ResultadoAtividades[];
   clusters: ResultadoCluster[];
+  arrecadacoes: ResultadoArrecadacao[];
 }
 
 export interface OpcoesCarga {
@@ -158,13 +160,19 @@ export interface OpcoesCarga {
   /** Assinatura da última carga que virou modelo; com `auto`, igual a esta significa "nada mudou". */
   assinaturaAnterior: string;
   auto: boolean;
-  /** Pasta: só lê os .xlsx com "Atividade" ou "Cluster" no nome. Arquivos escolhidos à mão: lê todos. */
+  /**
+   * Pasta: só lê os .xlsx com "Atividade" ou "Cluster" no nome e os .csv de uma pasta ou com nome de "Arrecadação".
+   * Arquivos escolhidos à mão: lê todos.
+   */
   soPorNome?: boolean;
+  /** Nome da pasta conectada: conta como parte do caminho ao procurar "Arrecadação" (a pasta pode ser a própria). */
+  raiz?: string;
   temModelo: boolean;
   onProgresso?: (p: ProgressoCarga) => void;
 }
 
 const isXlsx = (n: string): boolean => /\.xlsx$/i.test(n);
+const isCsv = (n: string): boolean => /\.csv$/i.test(n);
 
 const semAcento = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 /**
@@ -172,6 +180,11 @@ const semAcento = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u0
  * sem diferenciar maiúsculas nem acentos). "Termos de Janeiro a Agosto.xlsx", por exemplo, fica de fora e nem é aberto.
  */
 export const ehArquivoDoPainel = (nome: string): boolean => /atividade|cluster/.test(semAcento(nome));
+/**
+ * Na pasta, o .csv é de arrecadação quando "Arrecada" aparece no nome do arquivo ou de alguma pasta do caminho
+ * ("Arrecadação diária.csv", "Arrecadação acumulada/2026-08.csv"). Os demais .csv da pasta nem são abertos.
+ */
+export const ehArquivoDeArrecadacao = (caminho: string): boolean => /arrecada/.test(semAcento(caminho));
 const isFormatoAntigo = (n: string): boolean => /\.(xls|xlsb|xlsm)$/i.test(n);
 
 /**
@@ -193,6 +206,7 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
     ignoradosFormato: [],
     atividades: [],
     clusters: [],
+    arrecadacoes: [],
   };
   const candidatos: Entrada[] = [];
   for (const e of entries) {
@@ -200,6 +214,8 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
     if (isXlsx(e.name)) {
       if (opts.soPorNome && !ehArquivoDoPainel(e.name)) rel.ignoradosPorNome.push(e.path);
       else candidatos.push(e);
+    } else if (isCsv(e.name)) {
+      if (!opts.soPorNome || ehArquivoDeArrecadacao((opts.raiz ? opts.raiz + "/" : "") + e.path)) candidatos.push(e); // os outros .csv da pasta não são do painel
     } else if (isFormatoAntigo(e.name)) rel.ignoradosFormato.push(e.path);
   }
   if (!candidatos.length) {
@@ -240,12 +256,13 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
     if (!res) {
       try {
         try {
-          const lido = await lerArquivo(m.file, {
-            onProgress: (p) => opts.onProgresso?.({ arquivo: m.e.name, indice: i, total: metas.length, fase: p.phase, fracao: p.fraction }),
-          });
-          res = lido;
+          const leitura = {
+            onProgress: (p: { phase: string; fraction: number }) =>
+              opts.onProgresso?.({ arquivo: m.e.name, indice: i, total: metas.length, fase: p.phase, fracao: p.fraction }),
+          };
+          res = isCsv(m.e.name) ? await lerArrecadacao(m.file, leitura) : await lerArquivo(m.file, leitura);
         } catch (err) {
-          // outro Excel qualquer da pasta (nem atividades, nem Cluster): só fica registrado como ignorado
+          // outro Excel ou CSV qualquer da pasta (nem atividades, nem Cluster, nem arrecadação): só fica registrado como ignorado
           if (!(err instanceof NegError) || err.code !== "SEM_CABECALHO") throw err;
           res = { tipo: "ignorado", motivo: err.message };
         }
@@ -274,6 +291,7 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
   }
   rel.atividades = lidos.filter((r): r is ResultadoAtividades => r.tipo === "atividades");
   rel.clusters = lidos.filter((r): r is ResultadoCluster => r.tipo === "cluster");
+  rel.arrecadacoes = lidos.filter((r): r is ResultadoArrecadacao => r.tipo === "arrecadacao");
   if (!rel.atividades.length) {
     rel.semAtividades = true;
     return rel;

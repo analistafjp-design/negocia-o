@@ -1,7 +1,8 @@
 // Junta o que foi lido dos arquivos e liga as tabelas como no modelo do Power BI.
 import { RECURSOS, SERVICOS } from "./tabelas.ts";
 import { COD_CADASTRO, COD_NEGOCIACAO, chave, trimStr } from "./leitura.ts";
-import type { Atividade, Desdobro, Modelo, ResultadoArquivo, ResultadoAtividades, ResultadoCluster } from "./tipos.ts";
+import { ligarArrecadacao } from "./arrecadacao.ts";
+import type { Atividade, Desdobro, Modelo, ResultadoArquivo, ResultadoArrecadacao, ResultadoAtividades, ResultadoCluster } from "./tipos.ts";
 
 /** Categoria Principal do desdobro (categoria da atividade de origem), em código numérico. */
 export const K_OUTRA = 0;
@@ -69,6 +70,7 @@ export function consolidar(resultados: ResultadoArquivo[]): Modelo {
   const ix = indicesTabelas();
   const atv = resultados.filter((r): r is ResultadoAtividades => r.tipo === "atividades").sort(porCaminho);
   const clu = resultados.filter((r): r is ResultadoCluster => r.tipo === "cluster").sort(porCaminho);
+  const arq = resultados.filter((r): r is ResultadoArrecadacao => r.tipo === "arrecadacao").sort(porCaminho);
   const canon = { cluster: criarCanon(), cidade: criarCanon(), recurso: criarCanon(), motivo: criarCanon() };
 
   const clusterDe = new Map<string, string>();
@@ -113,6 +115,7 @@ export function consolidar(resultados: ResultadoArquivo[]): Modelo {
         mot: canon.motivo(motivo),
         val: a.val,
         cl: clusterDe.get(a.mat) || "",
+        arr: 0,
       });
     }
     for (const d of f.desdobros) {
@@ -124,9 +127,11 @@ export function consolidar(resultados: ResultadoArquivo[]): Modelo {
         cad: (COD_CADASTRO as readonly string[]).includes(d.cod),
         k: kDaCategoria(ix.porCodDesc.get(chave(d.codigo))), // Categoria Principal: a da atividade de origem
         val: d.val,
+        arr: 0,
       });
     }
   }
+  const arrecadacao = arq.length ? ligarArrecadacao(A, D, arq) : null; // soma em `arr` o que foi pago depois de cada negociação
   const frentes = new Set<string>();
   const clusters = new Set<string>();
   const meses = new Set<string>();
@@ -168,5 +173,6 @@ export function consolidar(resultados: ResultadoArquivo[]): Modelo {
       idsRepetidos: repetidas,
       semCodigoConhecido: semCodigo,
     },
+    arrecadacao,
   };
 }

@@ -53,12 +53,13 @@ const CARDS_QTD: Array<[keyof Medidas, string, boolean?]> = [
   ["pos", "Negociação Pós Corte"],
   ["total", "Total Negociações", true],
 ];
-const CARDS_VAL: Array<[keyof Medidas, string, boolean?]> = [
-  ["valPrincipal", "Negociação Principal $"],
-  ["valCorte", "Negociação $ Desdobro Corte"],
-  ["valDesdobro", "Negociação $ Desdobro"],
-  ["valPos", "Negociação $ Desdobro Pós Corte"],
-  ["valTotal", "Negociação Tot $", true],
+/** [negociado, arrecadado, rótulo, destaque]: com arquivo de arrecadação o cartão mostra o arrecadado e o negociado fica ao lado. */
+const CARDS_VAL: Array<[keyof Medidas, keyof Medidas, string, boolean?]> = [
+  ["valPrincipal", "arrPrincipal", "Negociação Principal $"],
+  ["valCorte", "arrCorte", "Negociação $ Desdobro Corte"],
+  ["valDesdobro", "arrDesdobro", "Negociação $ Desdobro"],
+  ["valPos", "arrPos", "Negociação $ Desdobro Pós Corte"],
+  ["valTotal", "arrTotal", "Negociação Tot $", true],
 ];
 
 const ESTILO_AVISO: Record<Aviso["kind"], string> = {
@@ -163,6 +164,7 @@ export default function NegociacoesClient() {
         assinaturaAnterior: assinatura.current,
         auto,
         soPorNome,
+        raiz: soPorNome ? nomeFonte : undefined,
         temModelo: modeloRef.current !== null,
         onProgresso: (p) => {
           if (auto || (p.fracao < 1 && Date.now() - ultimoProgresso.current < 120)) return;
@@ -344,6 +346,7 @@ export default function NegociacoesClient() {
 
   const op = modelo?.opcoes;
   const cards = visao?.cards ?? null;
+  const temArr = visao?.temArr ?? false;
   const valorCard = (k: keyof Medidas, dinheiro: boolean): string => {
     const v = cards ? cards[k] : null;
     return dinheiro ? fmtR0(v) : fmtQtd(v);
@@ -352,7 +355,7 @@ export default function NegociacoesClient() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <input ref={inpArquivos} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden data-entrada="arquivos" onChange={aoEscolherArquivos} />
+      <input ref={inpArquivos} type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" multiple hidden data-entrada="arquivos" onChange={aoEscolherArquivos} />
       <input ref={inpPasta} type="file" multiple hidden data-entrada="pasta" onChange={aoEscolherPasta} {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)} />
 
       <header className="border-b border-white/10 bg-gradient-to-r from-marca-media to-marca-escura text-white">
@@ -397,7 +400,7 @@ export default function NegociacoesClient() {
               disabled={carregando}
             >
               <Upload />
-              Importar Excel
+              Importar arquivos
             </Button>
           </div>
         </div>
@@ -449,10 +452,11 @@ export default function NegociacoesClient() {
             <KpiCard key={k} id={k} rotulo={rotulo} valor={valorCard(k, false)} destaque={destaque} />
           ))}
         </section>
-        <section aria-label="Valor negociado" className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-5">
-          {CARDS_VAL.map(([k, rotulo, destaque]) => (
-            <KpiCard key={k} id={k} rotulo={rotulo} valor={valorCard(k, true)} destaque={destaque} />
-          ))}
+        <section aria-label={temArr ? "Valor arrecadado e negociado" : "Valor negociado"} className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-5">
+          {CARDS_VAL.map(([neg, arr, rotulo, destaque]) => {
+            const valor = valorCard(temArr ? arr : neg, true);
+            return <KpiCard key={neg} id={neg} rotulo={rotulo} valor={valor} destaque={destaque} negociado={temArr && valor !== VAZIO ? valorCard(neg, true) : undefined} />;
+          })}
         </section>
 
         {/* Os quatro painéis em tela cheia, um embaixo do outro, na ordem do relatório (pedido do usuário, 16/10/2026). */}
@@ -462,6 +466,7 @@ export default function NegociacoesClient() {
               <ComercialArvore
                 linhas={visao.comercial.linhas}
                 total={visao.comercial.total}
+                temArr={temArr}
                 aberto={aberto}
                 aoAlternar={(id, abre) => setAberto((a) => ({ ...a, [id]: abre }))}
               />
@@ -471,14 +476,14 @@ export default function NegociacoesClient() {
           </Painel>
           <Painel id="top10" titulo="Top 10 Negociações">
             {visao && visao.top10.linhas.length ? (
-              <TopGrafico linhas={visao.top10.linhas} total={visao.top10.total} />
+              <TopGrafico linhas={visao.top10.linhas} total={visao.top10.total} temArr={temArr} />
             ) : (
               <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
             )}
           </Painel>
           <Painel id="cidade" titulo="Negociação x Cidade">
             {visao && visao.cidades.linhas.length ? (
-              <CidadeGrafico linhas={visao.cidades.linhas} total={visao.cidades.total} />
+              <CidadeGrafico linhas={visao.cidades.linhas} total={visao.cidades.total} temArr={temArr} />
             ) : (
               <Vazio texto={temDados ? "Sem negociações neste filtro." : "Conecte a pasta para ver os dados."} />
             )}

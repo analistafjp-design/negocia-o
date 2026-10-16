@@ -66,6 +66,9 @@ const celulas = (tr) => [...tr.children].map((c) => c.textContent).join(' ');
 const linha = async (page, painel, rotulo) =>
   limpa(await page.locator(`[data-painel="${painel}"] [data-linha="${rotulo}"]`).first().evaluate(celulas));
 const arquivosDoPrint = () => fs.readdirSync(PRINT).map((n) => path.join(PRINT, n));
+const ARRECADACAO = path.join(FX, 'arrecadacao');
+const arquivosDeArrecadacao = () => fs.readdirSync(ARRECADACAO).map((n) => path.join(ARRECADACAO, n));
+const reaisDe = (t) => Number(limpa(t).replace(/[^\d,]/g, '').replace(',', '.'));
 
 /** A leitura terminou quando o rodapé diz a hora em que a base foi lida (sem aviso na tela, a menos que peça ação). */
 async function aguardarLeitura(page) {
@@ -73,6 +76,10 @@ async function aguardarLeitura(page) {
 }
 async function carregarPrint(page) {
   await page.setInputFiles('input[data-entrada="arquivos"]', arquivosDoPrint());
+  await aguardarLeitura(page);
+}
+async function carregarPrintComArrecadacao(page) {
+  await page.setInputFiles('input[data-entrada="arquivos"]', [...arquivosDoPrint(), ...arquivosDeArrecadacao()]);
   await aguardarLeitura(page);
 }
 async function filtrarDiaDoPrint(page) {
@@ -120,6 +127,7 @@ test('arquivos do print: cartões de quantidade e de valor como no Power BI', as
     await Promise.all(['valPrincipal', 'valCorte', 'valDesdobro', 'valPos', 'valTotal'].map((k) => kpi(page, k))),
     ['R$ 40.382', '—', 'R$ 0', 'R$ 18.046', 'R$ 58.427']
   );
+  assert.equal(await page.locator('[data-kpi-negociado], [data-arrecadado], [data-total="arrecadado"]').count(), 0, 'sem arquivo de arrecadação a tela mostra só o negociado');
   assert.equal(await page.locator('[data-vazio]').count(), 0, 'o convite some depois de carregar');
   semErros(page);
   await page.context().close();
@@ -425,5 +433,136 @@ test('tela cheia: captura para conferência visual (opcional)', async () => {
   await filtrarDiaDoPrint(page);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(SHOTS, 'desktop.png'), fullPage: true });
+  await page.context().close();
+});
+
+test('arrecadação: o valor arrecadado fica em destaque nos cartões, com o negociado pequeno abaixo', async () => {
+  const page = await abrir();
+  await carregarPrintComArrecadacao(page);
+  await filtrarDiaDoPrint(page);
+  assert.deepEqual(
+    await Promise.all(['principal', 'cadastro', 'corte', 'desdobro', 'pos', 'total'].map((k) => kpi(page, k))),
+    ['124', '—', '—', '0', '8', '132'],
+    'as quantidades não mudam'
+  );
+  // 100001, 100002 e 100064 pagaram 1.574,56 em parcelas depois de negociar; o negociado do print segue R$ 58.427
+  assert.deepEqual(
+    await Promise.all(['valPrincipal', 'valCorte', 'valDesdobro', 'valPos', 'valTotal'].map((k) => kpi(page, k))),
+    ['R$ 183', '—', 'R$ 0', 'R$ 1.391', 'R$ 1.575']
+  );
+  assert.equal(limpa(await page.textContent('[data-kpi="valTotal"] [data-kpi-negociado]')), 'arrecadado de R$ 58.427 negociados');
+  assert.equal(limpa(await page.textContent('[data-kpi="valPos"] [data-kpi-negociado]')), 'arrecadado de R$ 18.046 negociados');
+  assert.equal(await page.locator('[data-kpi="valCorte"] [data-kpi-negociado]').count(), 0, 'sem registros: só o traço');
+  assert.equal(await page.locator('[data-kpi="total"] [data-kpi-negociado]').count(), 0, 'cartões de quantidade sem legenda de valor');
+  assert.equal(await page.locator('[data-aviso]').count(), 0, 'arrecadação lida sem problema: nada na tela');
+  await page.locator('[data-detalhes] summary').click();
+  const detalhes = limpa(await page.textContent('[data-detalhes]'));
+  assert.match(detalhes, /Arrecadação: 8 pagamentos de parcelas quitadas \(R\$ 3\.073,56\)/);
+  assert.match(detalhes, /Ligados a negociações da mesma matrícula: 6 \(R\$ 1\.574,56\)/);
+  assert.match(detalhes, /2 pagamentos apareciam em mais de um arquivo/);
+  semErros(page);
+  await page.context().close();
+});
+
+test('arrecadação: árvore, Top 10 e Negociação x Cidade trazem o arrecadado em destaque e o negociado ao lado', async () => {
+  const page = await abrir();
+  await carregarPrintComArrecadacao(page);
+  await filtrarDiaDoPrint(page);
+  const no = (nivel, rotulo) => page.locator(`[data-painel="comercial"] [data-nivel="${nivel}"][data-linha="${rotulo}"]`).first();
+  assert.equal(limpa(await no(0, 'Inadimplente').locator('[data-arrecadado]').textContent()), 'R$ 1.574,56');
+  const texto = async (rotulo, nivel) => limpa(await no(nivel, rotulo).evaluate(celulas));
+  assert.equal(await texto('Inadimplente', 0), 'Inadimplente 71 R$ 1.574,56 de R$ 33.942,74 negociados');
+  assert.equal(limpa(await no(0, 'Adimplente').locator('[data-arrecadado]').textContent()), 'R$ 0,00', 'negociou e nada pagou ainda: zero, não traço');
+  assert.equal(limpa(await no(1, 'Leitura').locator('[data-arrecadado]').textContent()), 'R$ 340,00');
+  assert.equal(limpa(await no(1, 'Corte e Religa').locator('[data-arrecadado]').textContent()), 'R$ 1.234,56');
+  assert.equal(await texto('Leitura', 1), 'Leitura 65 R$ 340,00 de R$ 15.787,90');
+  assert.equal(limpa(await page.textContent('[data-painel="comercial"] [data-total="arrecadado"]')), 'R$ 1.574,56');
+  assert.equal(limpa(await page.textContent('[data-painel="comercial"] [data-total="valor"]')), 'R$ 58.104,64', 'o negociado da matriz segue o do print');
+  assert.match(limpa(await page.textContent('[data-painel="comercial"]')), /Em destaque, o valor arrecadado/);
+  // Negociação x Cidade: colunas = arrecadado, ordenadas por ele; o total é o dos cartões
+  assert.equal(limpa(await page.textContent('[data-painel="cidade"] [data-total="arrecadado"]')), 'R$ 1.574,56');
+  assert.equal(limpa(await page.textContent('[data-painel="cidade"] [data-total="valor"]')), 'R$ 58.427,47');
+  assert.match(limpa(await page.textContent('[data-painel="cidade"] [data-grafico="cidades"]')), /Colunas: valor arrecadado \(R\$\)/);
+  const linhasCidade = await page.locator('[data-painel="cidade"] tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
+  const arrecadados = linhasCidade.map((c) => reaisDe(c[2]));
+  assert.deepEqual(arrecadados, [...arrecadados].sort((a, b) => b - a), 'ordenadas pelo arrecadado');
+  assert.ok(Math.abs(arrecadados.reduce((a, b) => a + b, 0) - 1574.56) < 0.005, 'as cidades somam o arrecadado');
+  assert.ok(linhasCidade.every((c) => /^R\$/.test(limpa(c[2])) && /^R\$/.test(limpa(c[3]))), 'arrecadado e negociado em cada cidade');
+  // Top 10: colunas = quantidade, linha = arrecadado
+  assert.match(limpa(await page.textContent('[data-painel="top10"] [data-grafico="top10"]')), /Linha: valor arrecadado \(R\$\)/);
+  assert.match(limpa(await page.textContent('[data-painel="top10"] [data-total="arrecadado"]')), /^R\$ [\d.]+,\d\d$/);
+  assert.equal(await page.locator('[data-painel="top10"] tbody tr').count(), 10);
+  // o balão traz os dois números exatos
+  await page.locator('[data-grafico="top10"] .recharts-bar-rectangle').first().hover();
+  await page.getByText(/^Top 1 · /).waitFor();
+  const balao = limpa(await page.locator('[data-painel="top10"] .bg-popover').first().textContent());
+  assert.match(balao, /valor arrecadado \(R\$\): R\$ [\d.]+,\d\d/);
+  assert.match(balao, /valor negociado \(R\$\): R\$ [\d.]+,\d\d/);
+  semErros(page);
+  await page.context().close();
+});
+
+test('arrecadação: a pasta é lida com a subpasta "Arrecadacao"; só os .csv dela entram', async () => {
+  const page = await abrir();
+  const pasta = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || '/tmp'), 'neg-arr-'));
+  try {
+    for (const n of fs.readdirSync(PRINT)) fs.copyFileSync(path.join(PRINT, n), path.join(pasta, n));
+    // sem acento nos nomes: o Chromium sem locale UTF-8 não anexa arquivo com acento (o acento é testado em core.test.mjs)
+    const dentro = path.join(pasta, 'Arrecadacao');
+    fs.mkdirSync(path.join(dentro, 'acumulada'), { recursive: true });
+    fs.copyFileSync(path.join(ARRECADACAO, 'arrecadacao_acumulada.csv'), path.join(dentro, 'acumulada', 'jan-set.csv')); // pela pasta
+    fs.copyFileSync(path.join(ARRECADACAO, 'arrecadacao_diaria.csv'), path.join(dentro, 'diaria.csv'));
+    fs.copyFileSync(path.join(ARRECADACAO, 'arrecadacao_diaria.csv'), path.join(pasta, 'Outro assunto.csv')); // fora da regra: nem é aberto
+    await page.setInputFiles('input[data-entrada="pasta"]', pasta);
+    await aguardarLeitura(page);
+    await filtrarDiaDoPrint(page);
+    assert.equal(await kpi(page, 'valTotal'), 'R$ 1.575');
+    assert.equal(limpa(await page.textContent('[data-kpi="valTotal"] [data-kpi-negociado]')), 'arrecadado de R$ 58.427 negociados');
+    await page.locator('[data-detalhes] summary').click();
+    assert.match(limpa(await page.textContent('[data-detalhes]')), /Arrecadação: 8 pagamentos.*em 2 arquivos/, 'os dois .csv da pasta Arrecadação; o "Outro assunto.csv" ficou de fora');
+    semErros(page);
+  } finally {
+    fs.rmSync(pasta, { recursive: true, force: true });
+    await page.context().close();
+  }
+});
+
+test('arrecadação: CSV que não é de arrecadação pede ação na tela e a base anterior fica', async () => {
+  const page = await abrir();
+  await carregarPrintComArrecadacao(page);
+  await filtrarDiaDoPrint(page);
+  await page.setInputFiles('input[data-entrada="arquivos"]', path.join(CASOS, 'arrecadacao_sem_valor.csv'));
+  await page.waitForSelector('[data-aviso="error"]');
+  assert.match(limpa(await page.textContent('[data-aviso="error"]')), /A base anterior foi mantida/);
+  assert.equal(await kpi(page, 'valTotal'), 'R$ 1.575', 'os números anteriores continuam na tela');
+  semErros(page);
+  await page.context().close();
+});
+
+test('arrecadação no celular (390 px): sem rolagem lateral e árvore legível', async () => {
+  const page = await abrir({ w: 390, h: 844 });
+  await carregarPrintComArrecadacao(page);
+  await filtrarDiaDoPrint(page);
+  await page.getByRole('button', { name: 'Expandir Leitura' }).first().click();
+  const sobra = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(sobra <= 0, 'rolagem lateral de ' + sobra + 'px');
+  for (const id of ['comercial', 'top10', 'cidade']) {
+    const lateral = await page.locator(`[data-painel="${id}"] [data-slot="card-content"]`).evaluate((el) => el.scrollWidth - el.clientWidth);
+    assert.ok(lateral <= 1, 'rolagem lateral dentro de ' + id + ': ' + lateral + 'px');
+  }
+  assert.equal(await kpi(page, 'valTotal'), 'R$ 1.575');
+  semErros(page);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'arrecadacao-celular.png'), fullPage: true });
+  await page.context().close();
+});
+
+test('arrecadação em tela cheia: captura para conferência visual (opcional)', async () => {
+  if (!SHOTS) return;
+  const page = await abrir({ w: 1440, h: 1000 });
+  await carregarPrintComArrecadacao(page);
+  await filtrarDiaDoPrint(page);
+  await page.getByRole('button', { name: 'Expandir Leitura' }).first().click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(SHOTS, 'arrecadacao-desktop.png'), fullPage: true });
   await page.context().close();
 });

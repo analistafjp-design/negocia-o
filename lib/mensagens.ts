@@ -1,5 +1,5 @@
 // Mensagens de status da leitura da pasta, em português do Brasil.
-import { fmtQtd, plural } from "./formato.ts";
+import { fmtData, fmtQtd, fmtR2, plural } from "./formato.ts";
 import type { RelatorioCarga } from "./fontes.ts";
 
 export type TipoAviso = "info" | "success" | "warning" | "error";
@@ -78,7 +78,9 @@ export function detalhesDaCarga(rel: RelatorioCarga, o: { auto: boolean }): Deta
       fmtQtd(r.desdobros) + " " + plural(r.desdobros, "desdobro", "desdobros") + " de " + r.arquivos + " " + plural(r.arquivos, "arquivo", "arquivos"),
     detalhe:
       "Cluster: " + fmtQtd(r.clusterMatriculas) + " " + plural(r.clusterMatriculas, "matrícula", "matrículas") + " de " + r.arquivosCluster + " " +
-      plural(r.arquivosCluster, "arquivo", "arquivos") + ". Lidos do arquivo agora: " + rel.leitura.lidos + " · reaproveitados: " + rel.leitura.reaproveitados + "." +
+      plural(r.arquivosCluster, "arquivo", "arquivos") +
+      (rel.modelo.arrecadacao ? " · Arrecadação: " + rel.modelo.arrecadacao.arquivos + " " + plural(rel.modelo.arrecadacao.arquivos, "arquivo", "arquivos") : "") +
+      ". Lidos do arquivo agora: " + rel.leitura.lidos + " · reaproveitados: " + rel.leitura.reaproveitados + "." +
       (rel.ignoradosPorNome.length
         ? ' Ignorados (sem "Atividade" nem "Cluster" no nome): ' + nomesIgnorados(rel.ignoradosPorNome) + "."
         : ""),
@@ -97,11 +99,31 @@ function analisar(rel: RelatorioCarga): { problemas: string[]; notas: string[] }
   const r = rel.modelo.resumo;
   rel.falhas.forEach((f) => problemas.push("Não importado: " + f.path + " — " + f.motivo));
   rel.ignoradosFormato.forEach((p) => problemas.push("Ignorado (formato não suportado, salve como .xlsx): " + p));
-  rel.ignorados.forEach((x) => problemas.push("Ignorado (não é de atividades nem Cluster): " + (x.path ?? "")));
+  rel.ignorados.forEach((x) => problemas.push("Ignorado (não é de atividades, Cluster nem arrecadação): " + (x.path ?? "")));
   rel.atividades.forEach((a) =>
     a.avisos.forEach((t) => (/^Coluna "/.test(t) ? problemas : notas).push((a.name ?? "") + ": " + t))
   );
   if (!rel.clusters.length) problemas.push('Nenhum arquivo Cluster_ encontrado: todas as negociações aparecem como "(sem cluster)".');
+  rel.arrecadacoes.forEach((a) => a.avisos.forEach((t) => notas.push((a.name ?? "") + ": " + t)));
+  const arr = rel.modelo.arrecadacao;
+  if (!arr) {
+    notas.push(
+      'Nenhum arquivo de arrecadação (.csv) encontrado: os valores em R$ são os negociados. Na pasta, o .csv é lido quando "Arrecadação" aparece no nome do arquivo ou de uma pasta do caminho.'
+    );
+  } else {
+    notas.push(
+      "Arrecadação: " + fmtQtd(arr.pagamentos) + " " + plural(arr.pagamentos, "pagamento", "pagamentos") + " de parcelas quitadas (" + fmtR2(arr.valor) + ")" +
+        (arr.primeira ? ", de " + fmtData(arr.primeira) + " a " + fmtData(arr.ultima) : "") + " em " + arr.arquivos + " " + plural(arr.arquivos, "arquivo", "arquivos") + ". " +
+        "Ligados a negociações da mesma matrícula: " + fmtQtd(arr.ligados) + " (" + fmtR2(arr.valorLigado) + ") — é o valor arrecadado do painel. " +
+        "Sem negociação da mesma matrícula até a data do pagamento (não entram em nenhum número): " + fmtQtd(arr.semNegociacao) + " (" + fmtR2(arr.valorSemNegociacao) + ")."
+    );
+    if (arr.repetidos) {
+      notas.push(
+        fmtQtd(arr.repetidos) + " " + plural(arr.repetidos, "pagamento aparecia", "pagamentos apareciam") +
+          " em mais de um arquivo (a diária repete o que a acumulada já traz) e " + plural(arr.repetidos, "contou", "contaram") + " uma vez."
+      );
+    }
+  }
   if (r.descartadasSemSetor) {
     const top = r.recursosSemSetor.slice(0, 4).map((x) => x.recurso + " (" + fmtQtd(x.linhas) + ")").join(", ");
     notas.push(
