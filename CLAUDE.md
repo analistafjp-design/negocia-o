@@ -15,6 +15,8 @@ Hospedagem: **GitHub Pages**.
 
 ## Como trabalhar com o usuário
 
+- O cabeçalho mostra **só o nome "Negociação"** e o cartão vazio só tem o botão Conectar pasta (pedido do
+  usuário, 16/10/2026): não recoloque subtítulo, selo nem os quatro quadrinhos de apresentação.
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.
@@ -31,8 +33,10 @@ Hospedagem: **GitHub Pages**.
 - **Fidelidade ao Power BI**: as medidas de `lib/medidas.ts` repetem o DAX do relatório. BLANK é `null` e
   aparece como `—`, nunca como zero. Não "corrija" a regra sem o usuário pedir; se uma regra parecer estranha,
   pergunte. Valores ficam em milésimos de centavo (`Currency.Type`), para a soma ser exata.
-- **Cor neutra (grafite)**: é o que distingue este painel dos outros (azul-petróleo, azul, roxo). Sem tons
-  coloridos nem cores fortes. Cores semânticas só nos avisos (verde/âmbar/vermelho bem suaves).
+- **Cor: azul do painel Cadastro e Venda** (pedido do usuário, 16/10/2026; antes era grafite): azul de ação
+  `#364dd4`, cabeçalho azul-marinho `#1c3a8f` > `#14296b`, fundo suave `#ebf0fe`. As cores ficam nos tokens
+  `--marca*` de `app/globals.css` (e as classes `bg-marca`, `from-marca-media`… do Tailwind); não espalhe cor
+  fixa nos componentes. Cores semânticas só nos avisos (verde/âmbar/vermelho bem suaves).
 - **Indicador sem coluna** não vira zero silencioso: o arquivo é recusado dizendo qual coluna falta.
 - **Arquivos reconhecidos pelas colunas**, não pelo nome. Planilhas que não são atividades nem Cluster são
   ignoradas (e listadas no aviso).

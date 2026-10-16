@@ -5,7 +5,7 @@ import "./globals.css";
 const basePath = process.env.NEXT_BASE_PATH ?? "";
 
 export const metadata: Metadata = {
-  title: "Negociações Interior",
+  title: "Negociação",
   description: "Negociações do Interior por frente de serviço e cluster, atualizadas por planilhas de uma pasta.",
   icons: {
     icon: `${basePath}/favicon.svg`,

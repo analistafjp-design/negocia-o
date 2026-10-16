@@ -84,6 +84,23 @@ test('sem dados: mostra o convite para conectar a pasta e os cartões vazios', a
   assert.match(limpa(await page.textContent('[data-painel="comercial"]')), /Conecte a pasta para ver os dados/);
   assert.equal(await page.isDisabled('#f-frente'), true);
   assert.match(limpa(await page.textContent('[data-acao="pasta"]')), /Conectar pasta/);
+  // pedido do usuário (16/10/2026): título só "Negociação" e, no cartão vazio, só o botão
+  assert.equal(limpa(await page.textContent('h1')), 'Negociação');
+  assert.equal(await page.title(), 'Negociação');
+  assert.equal(limpa(await page.textContent('[data-vazio]')), 'Conectar pasta');
+  assert.equal(await page.locator('[data-vazio] button').count(), 1);
+  semErros(page);
+  await page.context().close();
+});
+
+test('cor: azul do painel Cadastro e Venda (botão de ação e cabeçalho azul-marinho)', async () => {
+  const page = await abrir();
+  const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})`; };
+  const botao = await page.locator('[data-vazio] button').evaluate((el) => getComputedStyle(el).backgroundColor);
+  assert.equal(botao, rgb('#364dd4'));
+  const cab = await page.locator('header').evaluate((el) => getComputedStyle(el).backgroundImage);
+  assert.match(cab, /rgb\(28, 58, 143\)/, 'começa no azul #1c3a8f');
+  assert.match(cab, /rgb\(20, 41, 107\)/, 'termina no azul-marinho #14296b');
   semErros(page);
   await page.context().close();
 });

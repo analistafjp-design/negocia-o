@@ -6,32 +6,41 @@
   scrollbar-width: thin;
 }
 
-/* Tons de cinza (grafite): o Painel Executivo é azul-petróleo e o Pós-Corte é azul; este fica neutro. */
+/* Azul do painel Cadastro e Venda: cor de ação #364dd4 e cabeçalho azul-marinho (#1c3a8f > #14296b).
+   Trocar a cor do painel = mudar só os tokens --marca* e os de baixo. */
 :root {
-  --background: #f2f3f5;
-  --foreground: #1d2126;
+  --background: #f4f6f9;
+  --foreground: #11172a;
   --card: #ffffff;
-  --card-foreground: #1d2126;
+  --card-foreground: #11172a;
   --popover: #ffffff;
-  --popover-foreground: #1d2126;
-  --primary: #3d444d;
-  --primary-foreground: #fafafa;
-  --secondary: #eceff2;
-  --secondary-foreground: #1d2126;
-  --muted: #eceff2;
-  --muted-foreground: #6a727d;
-  --accent: #eceff2;
-  --accent-foreground: #1d2126;
-  --destructive: #b4413b;
-  --border: #e3e6ea;
-  --input: #cdd2d9;
-  --ring: #8b93a0;
-  --chart-1: #737b87;
-  --chart-2: #59626f;
-  --chart-3: #3d444d;
-  --chart-4: #a3aab3;
-  --chart-5: #c4cad2;
+  --popover-foreground: #11172a;
+  --primary: #364dd4;
+  --primary-foreground: #ffffff;
+  --secondary: #ebf0fe;
+  --secondary-foreground: #11172a;
+  --muted: #f1f3f6;
+  --muted-foreground: #67748a;
+  --accent: #ebf0fe;
+  --accent-foreground: #11172a;
+  --destructive: #b02a2a;
+  --border: #e3e7ee;
+  --input: #d3d9e4;
+  --ring: #6f86f0;
+  --chart-1: #4176d4;
+  --chart-2: #364dd4;
+  --chart-3: #14296b;
+  --chart-4: #b9c0cc;
+  --chart-5: #cddbf8;
   --radius: 0.75rem;
+
+  --marca: #364dd4;
+  --marca-media: #1c3a8f;
+  --marca-escura: #14296b;
+  --marca-suave: #ebf0fe;
+  --marca-linha: #cddbf8;
+  --tabela: #f1f4fb;
+  --tabela-texto: #3b4a72;
 }
 
 @theme inline {
@@ -53,6 +62,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-marca: var(--marca);
+  --color-marca-media: var(--marca-media);
+  --color-marca-escura: var(--marca-escura);
+  --color-marca-suave: var(--marca-suave);
+  --color-marca-linha: var(--marca-linha);
+  --color-tabela: var(--tabela);
+  --color-tabela-texto: var(--tabela-texto);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -83,7 +99,7 @@ body {
 
 * {
   box-sizing: border-box;
-  scrollbar-color: #9aa2ad transparent;
+  scrollbar-color: #9aa9cc transparent;
   scrollbar-width: thin;
 }
 

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CircleCheck, FolderOpen, Handshake, Info, RefreshCw, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -62,7 +61,7 @@ const CARDS_VAL: Array<[keyof Medidas, string, boolean?]> = [
 ];
 
 const ESTILO_AVISO: Record<Aviso["kind"], string> = {
-  info: "border-[#cdd2d9] bg-[#eceff2] text-[#2f3640]",
+  info: "border-marca-linha bg-marca-suave text-marca-media",
   success: "border-[#cddbd0] bg-[#edf2ee] text-[#2d573a]",
   warning: "border-[#e6dcb9] bg-[#f6f1e3] text-[#6b5416]",
   error: "border-[#e6c9c7] bg-[#f6e9e8] text-[#8a2e2a]",
@@ -347,20 +346,13 @@ export default function NegociacoesClient() {
       <input ref={inpArquivos} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden data-entrada="arquivos" onChange={aoEscolherArquivos} />
       <input ref={inpPasta} type="file" multiple hidden data-entrada="pasta" onChange={aoEscolherPasta} {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)} />
 
-      <header className="border-b border-white/10 bg-gradient-to-r from-[#2b3036] via-[#3d444d] to-[#4a525c] text-white">
+      <header className="border-b border-white/10 bg-gradient-to-r from-marca-media to-marca-escura text-white">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-3 py-4 sm:px-5 sm:py-5 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 sm:size-12 sm:rounded-2xl">
               <Handshake className="size-6 text-white" />
             </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[10px] font-bold tracking-[0.22em] text-white/70 uppercase">Interior</p>
-                <Badge className="border-white/15 bg-white/10 text-[10px] text-white hover:bg-white/10">Negociações</Badge>
-              </div>
-              <h1 className="mt-1 text-[clamp(1.125rem,2.3vw,1.5rem)] leading-tight font-bold tracking-tight break-words">Negociações por frente de serviço e cluster</h1>
-              <p className="mt-1 text-xs leading-relaxed text-white/60 break-words">Águas do Rio · dados processados no navegador, nada sai do computador</p>
-            </div>
+            <h1 className="text-[clamp(1.25rem,2.6vw,1.75rem)] leading-tight font-bold tracking-tight">Negociação</h1>
           </div>
           <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto xl:flex-wrap xl:items-center">
             <div className="mr-2 min-w-0 text-xs text-white/60">
@@ -369,7 +361,7 @@ export default function NegociacoesClient() {
             </div>
             <Button
               data-acao="pasta"
-              className="w-full bg-white whitespace-nowrap text-[#2b3036] hover:bg-slate-200 xl:w-auto"
+              className="w-full bg-white whitespace-nowrap text-marca-escura hover:bg-marca-suave xl:w-auto"
               onClick={() => void (fonte?.modo === "handle" || temDados ? atualizar() : conectarPasta())}
               disabled={carregando}
             >
@@ -406,35 +398,12 @@ export default function NegociacoesClient() {
         {aviso ? <AvisoView aviso={aviso} aoFechar={() => setAviso(null)} /> : null}
 
         {!temDados ? (
-          <Card data-vazio className="overflow-hidden border-0 bg-gradient-to-br from-white to-[#eceff2] py-0 shadow-sm">
-            <CardContent className="grid gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:grid-cols-[1.1fr_.9fr] lg:px-10">
-              <div className="flex flex-col justify-center">
-                <Badge className="mb-4 w-fit bg-[#3d444d] text-white hover:bg-[#3d444d]">PRONTO PARA CONECTAR</Badge>
-                <h2 className="max-w-2xl text-2xl font-bold tracking-tight text-[#2b3036] sm:text-3xl">Negociações do Interior em uma tela só.</h2>
-                <p className="mt-4 max-w-xl text-sm leading-6 text-slate-600">
-                  Conecte a pasta com os arquivos de <strong>atividades</strong> (aba &quot;Page 1&quot;) e o arquivo <strong>Cluster_</strong> (aba &quot;Planilha1&quot;). Nas próximas vezes o painel lembra da pasta e só relê o que mudou.
-                </p>
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <Button size="lg" className="bg-[#3d444d] hover:bg-[#2b3036]" onClick={() => void conectarPasta()} disabled={carregando}>
-                    <FolderOpen />
-                    {picker ? "Conectar pasta" : "Escolher pasta"}
-                  </Button>
-                  <span className="text-xs text-slate-500">Nenhum arquivo é enviado para a internet</span>
-                </div>
-              </div>
-              <ul className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                {[
-                  ["Cartões", "Principal, desdobro, corte e pós corte, em quantidade e valor"],
-                  ["Frente e cluster", "Matriz Cluster Perfil > frente de serviço > recurso"],
-                  ["Top 10 e cidades", "Recursos e cidades com mais negociações"],
-                  ["Motivos", "Por que a cobrança não foi executada"],
-                ].map(([t, d]) => (
-                  <li key={t} className="rounded-2xl border border-slate-200 bg-white/80 p-3">
-                    <p className="font-semibold text-[#2b3036]">{t}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{d}</p>
-                  </li>
-                ))}
-              </ul>
+          <Card data-vazio className="border-dashed py-0 shadow-sm">
+            <CardContent className="flex justify-center px-4 py-8">
+              <Button size="lg" className="bg-marca hover:bg-marca-media" onClick={() => void conectarPasta()} disabled={carregando}>
+                <FolderOpen />
+                {picker ? "Conectar pasta" : "Escolher pasta"}
+              </Button>
             </CardContent>
           </Card>
         ) : null}

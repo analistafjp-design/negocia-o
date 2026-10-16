@@ -6,19 +6,19 @@ import { fmtQtd, fmtR2 } from "@/lib/formato";
 import type { LinhaCidade, LinhaTop, Medidas, NoArvore } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
-const cabecalho = "sticky top-0 z-10 h-8 bg-[#f4f5f7] px-2 text-center text-[11.5px] font-bold tracking-wide text-[#4a525c]";
+const cabecalho = "sticky top-0 z-10 h-8 bg-tabela px-2 text-center text-[11.5px] font-bold tracking-wide text-tabela-texto";
 const num = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
 
 function Totais({ rotulo, m, vazioNoMeio }: { rotulo: string; m: Medidas; vazioNoMeio?: boolean }) {
   return (
-    <TableFooter className="bg-[#f4f5f7]">
-      <TableRow className="border-t border-[#cdd2d9] hover:bg-[#f4f5f7]">
-        <TableCell className="sticky bottom-0 bg-[#f4f5f7] px-2 py-1.5 font-bold">{rotulo}</TableCell>
-        {vazioNoMeio ? <TableCell className="sticky bottom-0 bg-[#f4f5f7]" /> : null}
-        <TableCell data-total="neg" className={cn(num, "sticky bottom-0 bg-[#f4f5f7] font-bold")}>
+    <TableFooter className="bg-tabela">
+      <TableRow className="border-t border-marca-linha hover:bg-tabela">
+        <TableCell className="sticky bottom-0 bg-tabela px-2 py-1.5 font-bold">{rotulo}</TableCell>
+        {vazioNoMeio ? <TableCell className="sticky bottom-0 bg-tabela" /> : null}
+        <TableCell data-total="neg" className={cn(num, "sticky bottom-0 bg-tabela font-bold")}>
           {fmtQtd(m.total)}
         </TableCell>
-        <TableCell data-total="valor" className={cn(num, "sticky bottom-0 bg-[#f4f5f7] font-bold")}>
+        <TableCell data-total="valor" className={cn(num, "sticky bottom-0 bg-tabela font-bold")}>
           {fmtR2(m.valTotal)}
         </TableCell>
       </TableRow>
@@ -44,7 +44,7 @@ export function ComercialTabela({
       const abre = no.id in aberto ? aberto[no.id] : no.nivel === 0;
       const temFilhos = no.filhos.length > 0;
       corpo.push(
-        <TableRow key={no.id} data-nivel={no.nivel} data-linha={no.rotulo} className={cn(no.nivel === 0 && "bg-[#fafbfb] font-semibold")}>
+        <TableRow key={no.id} data-nivel={no.nivel} data-linha={no.rotulo} className={cn(no.nivel === 0 && "bg-marca-suave/40 font-semibold")}>
           <TableCell className="px-2 py-1.5 whitespace-normal" style={{ paddingLeft: 8 + no.nivel * 18 }}>
             <div className="flex items-center gap-1">
               {temFilhos ? (
@@ -53,7 +53,7 @@ export function ComercialTabela({
                   aria-expanded={abre}
                   aria-label={(abre ? "Recolher " : "Expandir ") + no.rotulo}
                   onClick={() => aoAlternar(no.id, !abre)}
-                  className="grid size-5 shrink-0 place-items-center rounded text-[#4a525c] hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                  className="grid size-5 shrink-0 place-items-center rounded text-tabela-texto hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ChevronRight className={cn("size-3.5 transition-transform", abre && "rotate-90")} />
                 </button>
