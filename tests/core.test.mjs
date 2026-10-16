@@ -11,6 +11,7 @@ import * as Medidas from '../lib/medidas.ts';
 import * as Valores from '../lib/valores.ts';
 import * as Fontes from '../lib/fontes.ts';
 import * as Formato from '../lib/formato.ts';
+import { escalaDoEixo } from '../lib/eixo.ts';
 import { mensagemDaCarga } from '../lib/mensagens.ts';
 import { RECURSOS, SERVICOS } from '../lib/tabelas.ts';
 
@@ -515,4 +516,22 @@ test('rótulos do Motivo da não Execução: tudo em maiúsculas vira texto leg�
   assert.equal(longo.length, 3, 'no máximo 3 linhas');
   assert.ok(longo[2].endsWith('…'), 'o que passar vira reticências');
   assert.deepEqual(Formato.quebrar(''), []);
+});
+
+test('gráficos de colunas + linha: valores abreviados em "mil" e eixos com o mesmo número de divisões', () => {
+  assert.equal(Formato.fmtMil(14899.98), '14,9 mil');
+  assert.equal(Formato.fmtMil(31324.19), '31,3 mil');
+  assert.equal(Formato.fmtMil(20000), '20 mil');
+  assert.equal(Formato.fmtMil(86.75), '87');
+  assert.equal(Formato.fmtMil(0), '0');
+  // quantidade do Top 10 (máx. 109): eixo inteiro até 125 em 5 divisões
+  assert.deepEqual(escalaDoEixo(109, 5, true), { max: 125, ticks: [0, 25, 50, 75, 100, 125] });
+  // valor (máx. 14.899,98): passo redondo, 5 divisões, com folga acima do maior valor
+  const v = escalaDoEixo(14899.98);
+  assert.equal(v.ticks.length, 6);
+  assert.ok(v.max >= 14899.98 * 1.12 && v.ticks[5] === v.max);
+  // sem dados ou só zeros: eixo válido
+  assert.deepEqual(escalaDoEixo(0, 5, true), { max: 5, ticks: [0, 1, 2, 3, 4, 5] });
+  // contagem pequena nunca vira passo fracionário
+  assert.ok(escalaDoEixo(1, 5, true).ticks.every(Number.isInteger));
 });
