@@ -67,9 +67,13 @@ const linha = async (page, painel, rotulo) =>
   limpa(await page.locator(`[data-painel="${painel}"] [data-linha="${rotulo}"]`).first().evaluate(celulas));
 const arquivosDoPrint = () => fs.readdirSync(PRINT).map((n) => path.join(PRINT, n));
 
+/** A leitura terminou quando o rodapé diz a hora em que a base foi lida (sem aviso na tela, a menos que peça ação). */
+async function aguardarLeitura(page) {
+  await page.waitForFunction(() => /lida às/.test(document.querySelector('[data-rodape]')?.textContent || ''));
+}
 async function carregarPrint(page) {
   await page.setInputFiles('input[data-entrada="arquivos"]', arquivosDoPrint());
-  await page.waitForSelector('[data-aviso="success"], [data-aviso="warning"]');
+  await aguardarLeitura(page);
 }
 async function filtrarDiaDoPrint(page) {
   await page.selectOption('#f-mes', '2026-09');
@@ -302,20 +306,42 @@ test('lê a pasta inteira (com subpasta) e ignora o que não é do painel, como 
     fs.mkdirSync(path.join(pasta, 'De Janeiro a Setembro'));
     fs.copyFileSync(path.join(CASOS, 'varias_abas.xlsx'), path.join(pasta, 'De Janeiro a Setembro', 'Atividades-INTERIOR_01_09_26.xlsx'));
     await page.setInputFiles('input[data-entrada="pasta"]', pasta);
-    await page.waitForSelector('[data-aviso="warning"], [data-aviso="success"]');
+    await aguardarLeitura(page);
     await page.selectOption('#f-mes', '2026-09');
     assert.equal(await kpi(page, 'principal'), '128', '124 do dia + 3 do dia 28 + 1 da subpasta; o Termos (2) ficou de fora');
-    const aviso = limpa(await page.textContent('[data-aviso]'));
-    assert.match(aviso, /Base carregada: 135 atividades e 9 desdobros de 2 arquivos/);
-    assert.match(aviso, /Cluster: 129 matrículas de 1 arquivo/);
-    assert.match(aviso, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
-    assert.match(aviso, /7 atividades de recursos sem setor/);
+    // nada pede ação: nenhum aviso na tela; o resumo fica em "Detalhes da leitura", no rodapé, recolhido
+    assert.equal(await page.locator('[data-aviso]').count(), 0, 'sem aviso na tela');
+    assert.equal(await page.locator('[data-detalhes]').evaluate((el) => el.open), false, 'detalhes recolhidos');
+    await page.locator('[data-detalhes] summary').click();
+    const detalhes = limpa(await page.textContent('[data-detalhes]'));
+    assert.match(detalhes, /Base carregada: 135 atividades e 9 desdobros de 2 arquivos/);
+    assert.match(detalhes, /Cluster: 129 matrículas de 1 arquivo/);
+    assert.match(detalhes, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
+    assert.match(detalhes, /7 atividades de recursos sem setor/);
     assert.match(limpa(await page.textContent('[data-rodape]')), /Fonte: neg-pasta-/);
     semErros(page);
   } finally {
     fs.rmSync(pasta, { recursive: true, force: true });
     await page.context().close();
   }
+});
+
+test('sem o arquivo Cluster_ o aviso aparece na tela; com tudo certo não aparece aviso nenhum', async () => {
+  const page = await abrir();
+  const semCluster = arquivosDoPrint().filter((p) => !/Cluster/i.test(path.basename(p)));
+  await page.setInputFiles('input[data-entrada="arquivos"]', semCluster);
+  await page.waitForSelector('[data-aviso="warning"]');
+  const aviso = limpa(await page.textContent('[data-aviso="warning"]'));
+  assert.match(aviso, /Atenção na leitura/);
+  assert.match(aviso, /Nenhum arquivo Cluster_ encontrado/);
+  assert.doesNotMatch(aviso, /Base carregada|sem setor|atividades repetidas/, 'o resumo e as observações não ficam na tela');
+  // com o Cluster junto, o aviso some (a leitura nova é a mais recente)
+  await page.setInputFiles('input[data-entrada="arquivos"]', arquivosDoPrint());
+  await page.waitForFunction(() => !document.querySelector('[data-aviso]'));
+  assert.equal(await page.locator('[data-aviso]').count(), 0);
+  assert.match(limpa(await page.textContent('[data-detalhes] summary')), /Detalhes da leitura/);
+  semErros(page);
+  await page.context().close();
 });
 
 test('arquivo inválido: mensagem clara, e a base que já estava na tela é mantida', async () => {
