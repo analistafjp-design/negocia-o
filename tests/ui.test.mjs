@@ -186,6 +186,41 @@ test('matriz em árvore: Total > cluster > frente abre para o lado em tela larga
   await cel.context().close();
 });
 
+test('árvore aberta se ajusta à largura da tela: nada sai do painel e, se couber, nada encolhe', async () => {
+  const direita = (page, seletor) => page.locator(seletor).evaluateAll((els) => Math.max(...els.map((e) => e.getBoundingClientRect().right)));
+  // 1280 px (um notebook com a tela em 150%): a árvore aberta até os recursos é mais larga que o painel
+  const estreita = await abrir({ w: 1280, h: 800 });
+  await carregarPrint(estreita);
+  await filtrarDiaDoPrint(estreita);
+  assert.equal(await estreita.locator('[data-ajuste]').getAttribute('data-ajuste'), '1', 'só até a frente cabe: sem encolher');
+  await estreita.getByRole('button', { name: 'Expandir Leitura' }).first().click();
+  await estreita.locator('[data-painel="comercial"] [data-nivel="2"]').first().waitFor();
+  await estreita.waitForFunction(() => document.querySelector('[data-ajuste]')?.getAttribute('data-ajuste') !== '1');
+  const painel = await estreita.locator('[data-painel="comercial"]').boundingBox();
+  const limite = painel.x + painel.width;
+  assert.ok((await direita(estreita, '[data-painel="comercial"] [data-nivel="2"]')) <= limite + 0.5, 'os recursos ficam dentro do painel');
+  assert.ok((await direita(estreita, '[data-painel="comercial"] [data-nivel="1"]')) <= limite + 0.5);
+  const recurso = await estreita.locator('[data-painel="comercial"] [data-nivel="2"]').first().boundingBox();
+  assert.ok(recurso.width < 290 && recurso.width > 0.6 * 290 - 1, 'encolheu um pouco, sem passar de 40%: ' + recurso.width);
+  // fechar de volta devolve o tamanho
+  await estreita.getByRole('button', { name: 'Recolher Leitura' }).first().click();
+  await estreita.waitForFunction(() => document.querySelector('[data-ajuste]')?.getAttribute('data-ajuste') === '1');
+  assert.equal(await estreita.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, true, 'sem rolagem lateral na página');
+  semErros(estreita);
+  await estreita.context().close();
+  // 1440 px: cabe inteira, tamanho normal
+  const larga = await abrir({ w: 1440, h: 900 });
+  await carregarPrint(larga);
+  await filtrarDiaDoPrint(larga);
+  await larga.getByRole('button', { name: 'Expandir Leitura' }).first().click();
+  await larga.locator('[data-painel="comercial"] [data-nivel="2"]').first().waitFor();
+  assert.equal(await larga.locator('[data-ajuste]').getAttribute('data-ajuste'), '1', 'cabe: tamanho normal');
+  const r = await larga.locator('[data-painel="comercial"] [data-nivel="2"]').first().boundingBox();
+  assert.ok(Math.abs(r.width - 290) < 1.5, 'recurso com 290 px: ' + r.width);
+  semErros(larga);
+  await larga.context().close();
+});
+
 test('Negociação x Cidade: o total dos cartões passa 1 da soma das cidades (131 x 132 do print)', async () => {
   const page = await abrir();
   await carregarPrint(page);
