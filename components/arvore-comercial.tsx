@@ -48,7 +48,7 @@ function Ramo({ no, aberto, aoAlternar }: { no: NoArvore; aberto: Props["aberto"
         </div>
       ) : no.nivel === 1 ? (
         // Frente de serviço
-        <div data-nivel={1} data-linha={no.rotulo} className={cn(NO, "grid-cols-[minmax(0,1fr)_2.75rem_6.25rem_1.5rem] gap-x-2.5 py-1.5 pr-2.5 pl-3.5 text-sm xl:w-[370px]")}>
+        <div data-nivel={1} data-linha={no.rotulo} className={cn(NO, "grid-cols-[minmax(0,1fr)_2.75rem_6.25rem_1.5rem] gap-x-2.5 py-1.5 pr-2.5 pl-3.5 text-sm xl:w-[360px]")}>
           <span>{no.rotulo}</span>
           <span className={QTD}>{fmtQtd(no.m.total)}</span>
           <span className={VALOR}>{fmtR2(no.m.valTotal)}</span>

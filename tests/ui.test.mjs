@@ -198,7 +198,10 @@ test('árvore aberta se ajusta à largura da tela: nada sai do painel e, se coub
   await estreita.waitForFunction(() => document.querySelector('[data-ajuste]')?.getAttribute('data-ajuste') !== '1');
   const painel = await estreita.locator('[data-painel="comercial"]').boundingBox();
   const limite = painel.x + painel.width;
-  assert.ok((await direita(estreita, '[data-painel="comercial"] [data-nivel="2"]')) <= limite + 0.5, 'os recursos ficam dentro do painel');
+  const margemDireita = limite - (await direita(estreita, '[data-painel="comercial"] [data-nivel="2"]'));
+  assert.ok(margemDireita >= 24, 'os recursos ficam dentro do painel e não colados na borda: sobram ' + margemDireita + ' px');
+  const rolagem = await estreita.locator('[data-ajuste]').evaluate((el) => ({ vertical: el.scrollHeight - el.clientHeight, horizontal: el.scrollWidth - el.clientWidth }));
+  assert.ok(rolagem.vertical <= 1 && rolagem.horizontal <= 1, 'sem barra de rolagem dentro do painel quando a árvore encolhe e cabe: ' + JSON.stringify(rolagem));
   assert.ok((await direita(estreita, '[data-painel="comercial"] [data-nivel="1"]')) <= limite + 0.5);
   const recurso = await estreita.locator('[data-painel="comercial"] [data-nivel="2"]').first().boundingBox();
   assert.ok(recurso.width < 290 && recurso.width > 0.6 * 290 - 1, 'encolheu um pouco, sem passar de 40%: ' + recurso.width);
@@ -217,6 +220,9 @@ test('árvore aberta se ajusta à largura da tela: nada sai do painel e, se coub
   assert.equal(await larga.locator('[data-ajuste]').getAttribute('data-ajuste'), '1', 'cabe: tamanho normal');
   const r = await larga.locator('[data-painel="comercial"] [data-nivel="2"]').first().boundingBox();
   assert.ok(Math.abs(r.width - 290) < 1.5, 'recurso com 290 px: ' + r.width);
+  const painelLargo = await larga.locator('[data-painel="comercial"]').boundingBox();
+  const sobraLarga = painelLargo.x + painelLargo.width - (await direita(larga, '[data-painel="comercial"] [data-nivel="2"]'));
+  assert.ok(sobraLarga >= 24, 'também sobra folga à direita sem encolher: ' + sobraLarga + ' px');
   semErros(larga);
   await larga.context().close();
 });
