@@ -47,8 +47,13 @@ Hospedagem: **GitHub Pages**.
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.
-- Para cada pedido, um branch a partir da `main`, PR como **draft**, e **só mescle quando o usuário disser
-  "Pode mesclar"** (o check `build-and-test` precisa estar verde). Commits e PRs em português.
+- Para cada pedido, um branch a partir da `main` e um PR aberto como **draft**. Commits e PRs em português.
+- **Pode mesclar sozinha, sem esperar ordem nem perguntar de novo.** O usuário autorizou em 16/10/2026 ("Pode
+  mesclar. Não precisa me perguntar novamente! Grave isso.") e vale para qualquer sessão. Mescle quando o check
+  `build-and-test` do **último commit** estiver `success`, não houver conflito e não houver pergunta sua em aberto
+  ao usuário sobre aquele PR. Antes, tire o PR do modo draft e faça **squash merge com `expectedHeadSha`** (os 40
+  caracteres do commit). Depois, **avise o usuário o que foi mesclado** e confira a publicação (os runs "Publicar no
+  GitHub Pages" e "CI" da `main`). Check vermelho, conflito ou dúvida sobre o pedido: **não mescle**.
 - Nunca diga que algo foi publicado sem conferir; deixe claro se você não abriu o site.
 
 ## Regras que não podem ser quebradas
