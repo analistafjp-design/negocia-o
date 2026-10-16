@@ -31,7 +31,9 @@ Hospedagem: **GitHub Pages**.
   com aviso. **A matriz Negociações Comercial é uma árvore** (`components/arvore-comercial.tsx`; pedido do usuário, 16/10/2026,
   "Pode fazer a árvore", depois de ver a prévia): Total > cluster > frente > recurso, com **+/−** para abrir e fechar
   (as frentes abrem fechadas e os recursos aparecem no +). Em 1280 px ou mais ela abre para o lado, ligada por fios;
-  abaixo disso empilha, com recuo (CSS `.arv*` em `app/globals.css`). O Total da raiz (`data-total`) é o da matriz
+  abaixo disso empilha, com recuo (CSS `.arv*` em `app/globals.css`). **A árvore se ajusta sozinha à largura** (pedido do usuário, 16/10/2026: ao abrir os recursos ela
+  saía da tela; `components/ajustar-a-largura.tsx`): se a árvore aberta é mais larga que o painel, ela encolhe até
+  caber, sem passar de 60% (abaixo disso rola para o lado dentro do painel); se cabe, não mexe. O Total da raiz (`data-total`) é o da matriz
   (pode ser 131 quando os cartões dizem 132, como no print). **As frentes de um cluster podem somar mais que o cluster**:
   o desdobro de uma matrícula com atividades em mais de uma frente conta em cada frente e uma vez no cluster (medida
   do Power BI; pendente de conferir com um print do relatório). Não recoloque rolagem interna nem as tabelas de Top 10,
