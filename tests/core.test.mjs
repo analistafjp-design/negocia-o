@@ -12,7 +12,7 @@ import * as Valores from '../lib/valores.ts';
 import * as Fontes from '../lib/fontes.ts';
 import * as Formato from '../lib/formato.ts';
 import { escalaDoEixo } from '../lib/eixo.ts';
-import { mensagemDaCarga } from '../lib/mensagens.ts';
+import { detalhesDaCarga, mensagemDaCarga } from '../lib/mensagens.ts';
 import { RECURSOS, SERVICOS } from '../lib/tabelas.ts';
 
 const N = { ...Leitura, ...Modelo, ...Medidas, parseValor: Valores.parseValor, parseDateValue: Valores.parseDateValue };
@@ -459,9 +459,31 @@ test('pasta: só entram os .xlsx com "Atividade" ou "Cluster" no nome; o "Termos
   assert.ok(!abertos.includes('~$Atividades-INTERIOR_01_01_26.xlsx'));
   assert.equal(rel.modelo.resumo.arquivos, 2, 'dois arquivos de atividades (o da subpasta inclusive)');
   assert.equal(rel.modelo.resumo.atividades, 134 + 1);
-  const msg = mensagemDaCarga(rel, { auto: false, fonte: 'Interior', temModeloAnterior: false });
-  assert.ok(!msg.items.some((t) => /Termos/.test(t)), 'ignorar pelo nome não é problema: não vira item de aviso, só consta no resumo');
-  assert.match(msg.detail, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
+  // com o Cluster na pasta não há nada que peça ação: nenhum aviso na tela; o resumo vai para "Detalhes da leitura"
+  assert.equal(mensagemDaCarga(rel, { auto: false, fonte: 'Interior', temModeloAnterior: false }), null);
+  const det = detalhesDaCarga(rel, { auto: false });
+  assert.ok(!det.itens.some((t) => /Termos/.test(t)), 'ignorar pelo nome não é problema: não vira item, só consta no resumo');
+  assert.match(det.detalhe, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
+  assert.match(det.titulo, /^Base carregada: 135 atividades e 9 desdobros de 2 arquivos$/);
+});
+
+test('aviso na tela só quando pede ação; o resto vai para os detalhes da leitura', async () => {
+  const todos = fs.readdirSync(fx('print')).map((n) => entradaDe(fx('print', n), n, []));
+  const rel = await Fontes.carregarArquivos(todos, opcoesPasta());
+  assert.equal(mensagemDaCarga(rel, { auto: false, fonte: 'Interior', temModeloAnterior: false }), null, 'só observações do Power BI: sem aviso');
+  const det = detalhesDaCarga(rel, { auto: true });
+  assert.match(det.titulo, /^Pasta atualizada: /);
+  assert.ok(det.itens.some((t) => /sem setor no cadastro de recursos/.test(t)), 'a observação continua nos detalhes');
+  // sem o arquivo Cluster_ o painel avisa na tela (a matriz inteira cairia em "(sem cluster)")
+  const semCluster = fs.readdirSync(fx('print')).filter((n) => !/^Cluster/i.test(n)).map((n) => entradaDe(fx('print', n), n, []));
+  const rel2 = await Fontes.carregarArquivos(semCluster, opcoesPasta());
+  const msg = mensagemDaCarga(rel2, { auto: false, fonte: 'Interior', temModeloAnterior: false });
+  assert.equal(msg.kind, 'warning');
+  assert.deepEqual(msg.items, ['Nenhum arquivo Cluster_ encontrado: todas as negociações aparecem como "(sem cluster)".']);
+  assert.ok(detalhesDaCarga(rel2, { auto: false }).itens.includes(msg.items[0]), 'e também consta nos detalhes');
+  // sem modelo carregado não há detalhes
+  const vazio = await Fontes.carregarArquivos([entradaDe(fx('casos', 'valores_em_texto.xlsx'), 'Termos de Janeiro a Agosto.xlsx', [])], opcoesPasta());
+  assert.equal(detalhesDaCarga(vazio, { auto: false }), null);
 });
 
 test('arquivos escolhidos à mão (Importar Excel) são lidos pelas colunas, qualquer que seja o nome', async () => {

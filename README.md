@@ -38,6 +38,9 @@ Os quatro painéis de baixo ocupam a largura toda, um embaixo do outro, nessa or
 4. Outro navegador? Use **Importar Excel** e escolha os arquivos (sem acompanhamento automático); aí vale o que
    você escolheu, qualquer que seja o nome.
 
+O resumo da leitura (arquivos lidos, ignorados, observações do Power BI) fica recolhido em **Detalhes da leitura**, no
+rodapé. Na tela só aparece aviso quando algo pede ação, como a falta do arquivo `Cluster_`.
+
 Os resultados lidos ficam guardados **no navegador** (só as colunas usadas) para não reler tudo; o botão
 *Apagar dados gravados neste navegador* limpa isso. A base real nunca vai para o repositório
 (`.gitignore` bloqueia `.xlsx` e `.csv`).

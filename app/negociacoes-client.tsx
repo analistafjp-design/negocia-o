@@ -27,7 +27,7 @@ import {
   type PastaHandle,
 } from "@/lib/fontes";
 import { SEM_CLUSTER, calcular } from "@/lib/medidas";
-import { mensagemDaCarga, type Aviso } from "@/lib/mensagens";
+import { detalhesDaCarga, mensagemDaCarga, type Aviso, type Detalhes } from "@/lib/mensagens";
 import type { Filtros, Medidas, Modelo, ResultadoArquivo } from "@/lib/tipos";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +123,7 @@ export default function NegociacoesClient() {
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS);
   const [aberto, setAberto] = useState<Record<string, boolean>>({});
   const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [detalhes, setDetalhes] = useState<Detalhes | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [fonte, setFonte] = useState<Fonte | null>(null);
   const [leituraEm, setLeituraEm] = useState<Date | null>(null);
@@ -182,9 +183,12 @@ export default function NegociacoesClient() {
         setFiltros((f) => sanitizarFiltros(f, novo.opcoes, modeloRef.current === null));
         setModelo(novo);
         setLeituraEm(new Date());
+        setDetalhes(detalhesDaCarga(rel, { auto }));
       }
-      if (msg) setAviso(msg);
-      else if (!rel.modelo) setAviso(null);
+      // Sem mudança na pasta: o aviso que já está na tela (um problema da última leitura) continua, menos o de progresso.
+      // Leitura nova sem nada que peça ação: o aviso sai (inclusive o "Lendo arquivos…").
+      if (rel.semMudanca) setAviso((atual) => (atual && atual.progress !== undefined ? null : atual));
+      else setAviso(msg);
     } catch (err) {
       setAviso({ kind: "error", title: "Erro ao atualizar", detail: amigavel(err) + (modeloRef.current ? " A base anterior foi mantida." : "") });
     } finally {
@@ -506,6 +510,24 @@ export default function NegociacoesClient() {
               <Trash2 />
               Apagar dados gravados neste navegador
             </Button>
+          ) : null}
+          {detalhes ? (
+            <details data-detalhes className="basis-full">
+              <summary className="w-fit cursor-pointer font-semibold text-tabela-texto">Detalhes da leitura</summary>
+              <div className="mt-2 space-y-1.5 rounded-lg border border-marca-linha bg-white p-3">
+                <p className="font-semibold text-foreground">{detalhes.titulo}</p>
+                <p className="break-words">{detalhes.detalhe}</p>
+                {detalhes.itens.length ? (
+                  <ul className="list-disc space-y-0.5 pl-5">
+                    {detalhes.itens.map((t, i) => (
+                      <li key={i} className="break-words">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </details>
           ) : null}
         </footer>
       </div>

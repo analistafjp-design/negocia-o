@@ -37,6 +37,13 @@ Hospedagem: **GitHub Pages**.
   do Power BI; pendente de conferir com um print do relatório). Não recoloque rolagem interna nem as tabelas de Top 10,
   Cidade e Comercial sem ele pedir. O rótulo do Motivo é legível
   (`legivel`/`quebrar`, `lib/formato.ts`).
+- **Aviso da leitura** (pedido do usuário, 16/10/2026: "Isso aqui não precisa aparecer nessa tela. Muito feio!"):
+  o resumo da carga ("Base carregada: …") e as observações (recursos sem setor, atividades repetidas, JSON fora do
+  formato, código fora da tabela…) **não aparecem mais na tela**; ficam recolhidos em **"Detalhes da leitura", no
+  rodapé** (`detalhesDaCarga`, `lib/mensagens.ts`). Só **pede ação na tela** (aviso "Atenção na leitura" ou erro) o que
+  o usuário precisa resolver: arquivo que falhou, formato não aceito, arquivo que não é do painel, falta do `Cluster_`
+  e coluna opcional ausente (`analisar`). Um aviso de problema continua na tela quando a pasta não mudou; uma leitura
+  nova sem problema o tira. Não recoloque o resumo nem as observações no corpo da página.
 - Preserve o que já funciona. Não mude cartão, aba ou regra além do que foi pedido; o usuário pediu
   "somente as informações que estão no print", sem exagero.
 - **Não invente** dados, nomes de colunas nem resultados de testes. Todo número vem das planilhas lidas.
