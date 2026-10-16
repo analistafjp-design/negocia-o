@@ -138,6 +138,10 @@ export interface RelatorioCarga {
   semAtividades: boolean;
   /** Leitura automática em que nada mudou desde a última. */
   semMudanca: boolean;
+  /** Pasta com .xlsx, mas nenhum com "Atividade" ou "Cluster" no nome. */
+  semArquivosDoPainel: boolean;
+  /** .xlsx da pasta que não foram abertos: o nome não tem "Atividade" nem "Cluster". */
+  ignoradosPorNome: string[];
   modelo: Modelo | null;
   assinatura: string;
   leitura: { lidos: number; reaproveitados: number };
@@ -154,11 +158,20 @@ export interface OpcoesCarga {
   /** Assinatura da última carga que virou modelo; com `auto`, igual a esta significa "nada mudou". */
   assinaturaAnterior: string;
   auto: boolean;
+  /** Pasta: só lê os .xlsx com "Atividade" ou "Cluster" no nome. Arquivos escolhidos à mão: lê todos. */
+  soPorNome?: boolean;
   temModelo: boolean;
   onProgresso?: (p: ProgressoCarga) => void;
 }
 
 const isXlsx = (n: string): boolean => /\.xlsx$/i.test(n);
+
+const semAcento = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+/**
+ * Na pasta, só os arquivos com "Atividade" ou "Cluster" no nome são do painel (a regra do relatório do Power BI,
+ * sem diferenciar maiúsculas nem acentos). "Termos de Janeiro a Agosto.xlsx", por exemplo, fica de fora e nem é aberto.
+ */
+export const ehArquivoDoPainel = (nome: string): boolean => /atividade|cluster/.test(semAcento(nome));
 const isFormatoAntigo = (n: string): boolean => /\.(xls|xlsb|xlsm)$/i.test(n);
 
 /**
@@ -170,6 +183,8 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
     semXlsx: false,
     semAtividades: false,
     semMudanca: false,
+    semArquivosDoPainel: false,
+    ignoradosPorNome: [],
     modelo: null,
     assinatura: "",
     leitura: { lidos: 0, reaproveitados: 0 },
@@ -182,11 +197,14 @@ export async function carregarArquivos(entries: Entrada[], opts: OpcoesCarga): P
   const candidatos: Entrada[] = [];
   for (const e of entries) {
     if (e.name.startsWith("~$")) continue; // temporários do Excel
-    if (isXlsx(e.name)) candidatos.push(e);
-    else if (isFormatoAntigo(e.name)) rel.ignoradosFormato.push(e.path);
+    if (isXlsx(e.name)) {
+      if (opts.soPorNome && !ehArquivoDoPainel(e.name)) rel.ignoradosPorNome.push(e.path);
+      else candidatos.push(e);
+    } else if (isFormatoAntigo(e.name)) rel.ignoradosFormato.push(e.path);
   }
   if (!candidatos.length) {
-    rel.semXlsx = true;
+    rel.semArquivosDoPainel = rel.ignoradosPorNome.length > 0;
+    rel.semXlsx = !rel.semArquivosDoPainel;
     return rel;
   }
 

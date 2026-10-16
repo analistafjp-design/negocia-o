@@ -29,9 +29,12 @@ Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho az
      `Data`, `Negociou O Débito?`, `Valor Total dos Débitos` e `Body Adicional Executado`
      (opcionais: `ID da Atividade`, `Cidade`, `Motivo de Não Execução - Cobrança/Normal`);
    - o arquivo **Cluster_** (aba `Planilha1`), com `NUM_LIGACAO` e `CLUSTER SALDO`.
-   O painel reconhece cada arquivo **pelas colunas**, não pelo nome; outras planilhas da pasta são ignoradas.
+   Na pasta, **só são lidos os `.xlsx` com "Atividade" ou "Cluster" no nome** (como no Power BI), inclusive nas
+   subpastas; os demais (por exemplo `Termos de Janeiro a Agosto.xlsx`) são ignorados sem nem serem abertos e
+   aparecem no resumo da leitura. Dentro de cada arquivo, a aba é reconhecida pelas colunas.
 3. Nas próximas vezes ele lembra da pasta, relê só o que mudou e confere a pasta sozinho a cada 60 s.
-4. Outro navegador? Use **Importar Excel** e escolha os arquivos (sem acompanhamento automático).
+4. Outro navegador? Use **Importar Excel** e escolha os arquivos (sem acompanhamento automático); aí vale o que
+   você escolheu, qualquer que seja o nome.
 
 Os resultados lidos ficam guardados **no navegador** (só as colunas usadas) para não reler tudo; o botão
 *Apagar dados gravados neste navegador* limpa isso. A base real nunca vai para o repositório

@@ -76,28 +76,27 @@ async function filtrarDiaDoPrint(page) {
   await page.selectOption('#f-data', '2026-09-29');
 }
 
-test('sem dados: mostra o convite para conectar a pasta e os cartões vazios', async () => {
+test('sem dados: cartões vazios e um único botão Conectar pasta (o do cabeçalho)', async () => {
   const page = await abrir();
-  await page.waitForSelector('[data-vazio]');
   assert.equal(await kpi(page, 'total'), '—');
   assert.equal(await kpi(page, 'valTotal'), '—');
   assert.match(limpa(await page.textContent('[data-painel="comercial"]')), /Conecte a pasta para ver os dados/);
   assert.equal(await page.isDisabled('#f-frente'), true);
   assert.match(limpa(await page.textContent('[data-acao="pasta"]')), /Conectar pasta/);
-  // pedido do usuário (16/10/2026): título só "Negociação" e, no cartão vazio, só o botão
+  // pedidos do usuário (16/10/2026): título só "Negociação" e o botão Conectar pasta só no cabeçalho
   assert.equal(limpa(await page.textContent('h1')), 'Negociação');
   assert.equal(await page.title(), 'Negociação');
-  assert.equal(limpa(await page.textContent('[data-vazio]')), 'Conectar pasta');
-  assert.equal(await page.locator('[data-vazio] button').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Conectar pasta' }).count(), 1, 'sem botão repetido no corpo da página');
+  assert.equal(await page.locator('[data-vazio]').count(), 0);
   semErros(page);
   await page.context().close();
 });
 
-test('cor: azul do painel Cadastro e Venda (botão de ação e cabeçalho azul-marinho)', async () => {
+test('cor: azul do painel Cadastro e Venda (cartão de Total e cabeçalho azul-marinho)', async () => {
   const page = await abrir();
   const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})`; };
-  const botao = await page.locator('[data-vazio] button').evaluate((el) => getComputedStyle(el).backgroundColor);
-  assert.equal(botao, rgb('#364dd4'));
+  const total = await page.locator('[data-kpi="total"]').evaluate((el) => getComputedStyle(el).backgroundImage);
+  assert.ok(total.includes(rgb('#364dd4')), 'o Total termina no azul de ação #364dd4');
   const cab = await page.locator('header').evaluate((el) => getComputedStyle(el).backgroundImage);
   assert.match(cab, /rgb\(28, 58, 143\)/, 'começa no azul #1c3a8f');
   assert.match(cab, /rgb\(20, 41, 107\)/, 'termina no azul-marinho #14296b');
@@ -201,20 +200,24 @@ test('filtros: o mês mais recente vem escolhido; frente, cluster e data refazem
   await page.context().close();
 });
 
-test('lê a pasta inteira (atividades + Cluster) e ignora planilhas que não são nem uma nem outra', async () => {
+test('lê a pasta inteira (com subpasta) e ignora o que não é do painel, como o "Termos de Janeiro a Agosto"', async () => {
   const page = await abrir();
   const pasta = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || '/tmp'), 'neg-pasta-'));
   try {
     for (const n of fs.readdirSync(PRINT)) fs.copyFileSync(path.join(PRINT, n), path.join(pasta, n));
-    fs.copyFileSync(path.join(CASOS, 'sem_cabecalho.xlsx'), path.join(pasta, 'Outra planilha qualquer.xlsx'));
+    // tem colunas de atividades (2 negociações em 29/09), mas o nome não é do painel: não pode entrar na conta
+    fs.copyFileSync(path.join(CASOS, 'valores_em_texto.xlsx'), path.join(pasta, 'Termos de Janeiro a Agosto.xlsx'));
+    // arquivo de atividades numa subpasta (1 negociação em 29/09): tem de entrar
+    fs.mkdirSync(path.join(pasta, 'De Janeiro a Setembro'));
+    fs.copyFileSync(path.join(CASOS, 'varias_abas.xlsx'), path.join(pasta, 'De Janeiro a Setembro', 'Atividades-INTERIOR_01_09_26.xlsx'));
     await page.setInputFiles('input[data-entrada="pasta"]', pasta);
     await page.waitForSelector('[data-aviso="warning"], [data-aviso="success"]');
     await page.selectOption('#f-mes', '2026-09');
-    assert.equal(await kpi(page, 'principal'), '127');
+    assert.equal(await kpi(page, 'principal'), '128', '124 do dia + 3 do dia 28 + 1 da subpasta; o Termos (2) ficou de fora');
     const aviso = limpa(await page.textContent('[data-aviso]'));
-    assert.match(aviso, /Base carregada: 134 atividades e 9 desdobros de 1 arquivo/);
+    assert.match(aviso, /Base carregada: 135 atividades e 9 desdobros de 2 arquivos/);
     assert.match(aviso, /Cluster: 129 matrículas de 1 arquivo/);
-    assert.match(aviso, /Ignorado \(não é de atividades nem Cluster\): .*Outra planilha qualquer\.xlsx/);
+    assert.match(aviso, /Ignorados \(sem "Atividade" nem "Cluster" no nome\): Termos de Janeiro a Agosto\.xlsx\./);
     assert.match(aviso, /7 atividades de recursos sem setor/);
     assert.match(limpa(await page.textContent('[data-rodape]')), /Fonte: neg-pasta-/);
     semErros(page);
