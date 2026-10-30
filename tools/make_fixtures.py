@@ -229,6 +229,10 @@ def casos(saida):
     escrever_cluster(saida / "Cluster_B.xlsx", [(555001, "Esquecido"), (555003, "Flutuante")], aba="Outra")
     # 8) arquivo que não é xlsx
     (saida / "corrompido.xlsx").write_bytes(b"isto nao e um xlsx")
+    # 9) linhas físicas esparsas: a auditoria deve apontar 7 e 12, não a posição na lista.
+    esparsas = [base[0], {}, {}, {}, {}, base[1]]
+    esparsas[0] = dict(base[0], **{"Data": "data inválida", "Valor Total dos Débitos": "valor inválido"})
+    escrever_atividades(saida / "auditoria_esparsa.xlsx", esparsas, aba="Dados", prefixo=("Relatório", "Teste", "", "", ""))
 
 
 CAB_ARRECADACAO = [

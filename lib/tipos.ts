@@ -3,6 +3,18 @@
 // Valores em dinheiro ficam em milésimos de centavo (4 casas, como o Currency.Type do Power BI):
 // a soma é exata. Use `reais()` para mostrar. BLANK do DAX é `null`.
 
+/** Proveniência opcional de uma linha na etapa de leitura; sem alterar as regras do painel. */
+export interface RegistroLeitura {
+  tipo: "atividade" | "desdobro" | "cluster" | "pagamento";
+  aba: string;
+  linha: number;
+  linhaFim?: number;
+  estado: "aceito" | "parcial" | "ignorado";
+  motivos: string[];
+  /** Índice no respectivo array normalizado; ausente quando a linha foi ignorada. */
+  indice?: number;
+}
+
 /** Uma atividade como vem do arquivo (só as colunas usadas). */
 export interface AtividadeLida {
   id: string;

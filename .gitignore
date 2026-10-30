@@ -48,3 +48,6 @@ next-env.d.ts
 *.xls
 *.xlsb
 *.csv
+
+# Saída privada do importador local: pode conter dados pessoais e cópias de origem.
+/piloto/dados-local/

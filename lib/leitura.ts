@@ -9,6 +9,7 @@ import type {
   ResultadoArquivo,
   ResultadoAtividades,
   ResultadoCluster,
+  RegistroLeitura,
 } from "./tipos.ts";
 
 export { NegError };
@@ -126,7 +127,7 @@ async function sondarAba(wb: Planilha, sheet: Aba, ctx: Contexto): Promise<{ tip
 
 type AoProgresso = (fracao: number) => void;
 
-async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress?: AoProgresso) {
+async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress?: AoProgresso, onRegistro?: (r: RegistroLeitura) => void) {
   const fieldOfCol = new Int16Array(16384).fill(-1);
   const D1904 = ctx.date1904;
   const fv: Array<string | undefined> = new Array(CAMPOS_ATV.length);
@@ -141,7 +142,7 @@ async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgr
     wb,
     sheet,
     ctx,
-    (n, cols, vals, kinds) => {
+    (n, cols, vals, kinds, linha) => {
       if (!found) {
         if (++linhasCab > MAX_LINHAS_CABECALHO) return true;
         const achados = acharCampos(n, cols, vals, MAPA_ATV);
@@ -163,6 +164,7 @@ async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgr
       }
       if (!algum) {
         st.vazias++;
+        onRegistro?.({ tipo: "atividade", aba: sheet.name, linha, estado: "ignorado", motivos: ["LINHA_VAZIA"] });
         return false;
       }
       st.linhas++;
@@ -182,6 +184,10 @@ async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgr
       const mat = matriculaTexto(fv[FI.matricula]);
       const recurso = trimStr(fv[FI.recurso]);
       const codigo = trimStr(fv[FI.codigo]);
+      const motivos: string[] = [];
+      if (!data) motivos.push(trimStr(fv[FI.data]) ? "DATA_INVALIDA" : "SEM_DATA");
+      if (val === null && trimStr(fv[FI.valor])) motivos.push("VALOR_INVALIDO");
+      const indiceAtividade = atividades.length;
       atividades.push({
         id: trimStr(fv[FI.id]),
         recurso,
@@ -197,9 +203,14 @@ async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgr
       const body = trimStr(fv[FI.body]);
       if (body) {
         const { cods, erro } = codigosDoBody(body);
-        if (erro) st.jsonInvalido++;
-        for (const cod of cods) if (CODIGOS_DESDOBRO.has(cod)) desdobros.push({ mat, data, recurso, codigo, cod, val });
+        if (erro) { st.jsonInvalido++; motivos.push("JSON_INVALIDO_COM_RECUPERACAO"); }
+        for (const cod of cods) if (CODIGOS_DESDOBRO.has(cod)) {
+          const indice = desdobros.length;
+          desdobros.push({ mat, data, recurso, codigo, cod, val });
+          onRegistro?.({ tipo: "desdobro", aba: sheet.name, linha, estado: motivos.length ? "parcial" : "aceito", motivos: [...motivos], indice });
+        }
       }
+      onRegistro?.({ tipo: "atividade", aba: sheet.name, linha, estado: motivos.length ? "parcial" : "aceito", motivos, indice: indiceAtividade });
       return false;
     },
     onProgress,
@@ -226,7 +237,7 @@ async function lerAbaAtividades(wb: Planilha, sheet: Aba, ctx: Contexto, onProgr
   return { atividades, desdobros, stats: st, avisos };
 }
 
-async function lerAbaCluster(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress?: AoProgresso) {
+async function lerAbaCluster(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress?: AoProgresso, onRegistro?: (r: RegistroLeitura) => void) {
   let colMat = -1;
   let colCl = -1;
   let ok = false;
@@ -238,7 +249,7 @@ async function lerAbaCluster(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress
     wb,
     sheet,
     ctx,
-    (n, cols, vals) => {
+    (n, cols, vals, _kinds, linha) => {
       if (!ok) {
         if (++linhasCab > MAX_LINHAS_CABECALHO) return true;
         const achados = acharCampos(n, cols, vals, MAPA_CLUSTER);
@@ -255,13 +266,19 @@ async function lerAbaCluster(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress
         if (cols[j] === colMat) mat = matriculaTexto(vals[j]);
         else if (cols[j] === colCl) cl = trimStr(vals[j]);
       }
-      if (!mat) return false;
+      if (!mat) {
+        onRegistro?.({ tipo: "cluster", aba: sheet.name, linha, estado: "ignorado", motivos: ["SEM_MATRICULA"] });
+        return false;
+      }
       if (vistos.has(mat)) {
         duplicadas++;
+        onRegistro?.({ tipo: "cluster", aba: sheet.name, linha, estado: "ignorado", motivos: ["CLUSTER_MATRICULA_REPETIDA"] });
         return false;
       }
       vistos.add(mat);
+      const indice = pares.length;
       pares.push([mat, cl]);
+      onRegistro?.({ tipo: "cluster", aba: sheet.name, linha, estado: "aceito", motivos: [], indice });
       return false;
     },
     onProgress,
@@ -273,6 +290,7 @@ async function lerAbaCluster(wb: Planilha, sheet: Aba, ctx: Contexto, onProgress
 
 export interface OpcoesLeitura {
   onProgress?: (p: { phase: string; fraction: number }) => void;
+  onRegistro?: (registro: RegistroLeitura) => void;
 }
 
 /**
@@ -302,10 +320,10 @@ export async function lerArquivo(file: ArquivoLido, opts: OpcoesLeitura = {}): P
   const aba = escolhida.s;
   const onProgress: AoProgresso | undefined = opts.onProgress ? (f) => opts.onProgress?.({ phase: "Lendo aba " + aba.name, fraction: f }) : undefined;
   if (escolhida.tipo === "cluster") {
-    const r = await lerAbaCluster(wb, aba, ctx, onProgress);
+    const r = await lerAbaCluster(wb, aba, ctx, onProgress, opts.onRegistro);
     return { tipo: "cluster", aba: aba.name, pares: r.pares, duplicadas: r.duplicadas, avisos: [] };
   }
-  const r = await lerAbaAtividades(wb, aba, ctx, onProgress);
+  const r = await lerAbaAtividades(wb, aba, ctx, onProgress, opts.onRegistro);
   return { tipo: "atividades", aba: aba.name, atividades: r.atividades, desdobros: r.desdobros, stats: r.stats, avisos: r.avisos };
 }
 
