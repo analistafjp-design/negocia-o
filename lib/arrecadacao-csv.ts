@@ -4,7 +4,7 @@
 import { matriculaTexto, normHeader, paraFixo, trimStr } from "./leitura.ts";
 import { parseDateText, parseValor, isoDate } from "./valores.ts";
 import { NegError, type ArquivoLido } from "./xlsx-reader.ts";
-import type { EstatisticasArrecadacao, PagamentoLido, ResultadoArrecadacao } from "./tipos.ts";
+import type { EstatisticasArrecadacao, PagamentoLido, RegistroLeitura, ResultadoArrecadacao } from "./tipos.ts";
 
 const BLOCO = 4 * 1024 * 1024;
 const MAX_LINHAS_CABECALHO = 30;
@@ -98,26 +98,30 @@ function camposSimples(linha: string, d: string, quer: boolean[], saida: string[
 }
 
 /** Chama `aoLer` com cada registro do arquivo (uma linha, ou várias quando um campo entre aspas tem quebra de linha). */
-async function varrerRegistros(file: ArquivoLido, aoLer: (registro: string) => boolean | void, onProgress?: (fracao: number) => void): Promise<void> {
+async function varrerRegistros(file: ArquivoLido, aoLer: (registro: string, linha: number, linhaFim: number) => boolean | void, onProgress?: (fracao: number) => void): Promise<void> {
   let dec: TextDecoder | null = null;
   let resto = "";
   let aberto = ""; // registro com aspas ainda abertas, esperando a próxima linha
   let parar = false;
+  let linhaFisica = 0;
+  let inicioAberto = 0;
   const registro = (linha: string): void => {
+    linhaFisica++;
     if (aberto) {
       aberto += "\n" + linha;
       if ((aberto.split('"').length - 1) % 2 === 0) {
         const pronto = aberto;
         aberto = "";
-        if (aoLer(pronto) === true) parar = true;
+        if (aoLer(pronto, inicioAberto, linhaFisica) === true) parar = true;
       }
       return;
     }
     if (linha.indexOf('"') >= 0 && (linha.split('"').length - 1) % 2 === 1) {
       aberto = linha;
+      inicioAberto = linhaFisica;
       return;
     }
-    if (aoLer(linha) === true) parar = true;
+    if (aoLer(linha, linhaFisica, linhaFisica) === true) parar = true;
   };
   for (let ini = 0; ini < file.size && !parar; ini += BLOCO) {
     const bytes = new Uint8Array(await file.slice(ini, Math.min(file.size, ini + BLOCO)).arrayBuffer());
@@ -134,12 +138,13 @@ async function varrerRegistros(file: ArquivoLido, aoLer: (registro: string) => b
   if (!parar) {
     const fim = resto + (dec ? dec.decode() : "");
     if (fim) registro(fim.endsWith("\r") ? fim.slice(0, -1) : fim);
-    if (aberto) aoLer(aberto);
+    if (aberto) aoLer(aberto, inicioAberto, linhaFisica);
   }
 }
 
 export interface OpcoesCsv {
   onProgress?: (p: { phase: string; fraction: number }) => void;
+  onRegistro?: (registro: RegistroLeitura) => void;
 }
 
 /**
@@ -159,7 +164,7 @@ export async function lerArrecadacao(file: ArquivoLido, opts: OpcoesCsv = {}): P
 
   await varrerRegistros(
     file,
-    (reg) => {
+    (reg, linha, linhaFim) => {
       if (!col) {
         if (++linhasCab > MAX_LINHAS_CABECALHO) return true;
         const d = delimitadorDe(reg);
@@ -180,33 +185,41 @@ export async function lerArrecadacao(file: ArquivoLido, opts: OpcoesCsv = {}): P
         }
         return false;
       }
-      if (reg === "") return false;
+      const auditar = (estado: RegistroLeitura["estado"], motivo: string, indice?: number): void => {
+        opts.onRegistro?.({ tipo: "pagamento", aba: "CSV", linha, linhaFim, estado, motivos: motivo ? [motivo] : [], ...(indice === undefined ? {} : { indice }) });
+      };
+      if (reg === "") { auditar("ignorado", "LINHA_VAZIA"); return false; }
       const c = col as Partial<Record<Chave, number>>;
       const f = reg.indexOf('"') >= 0 ? camposComAspas(reg, delim) : (camposSimples(reg, delim, quer, campos), campos);
       const tipo = f[c.tipo as number] ?? "";
-      if (tipo === "" && trimStr(f[c.mat as number]) === "") return false; // linha em branco (só separadores)
+      if (tipo === "" && trimStr(f[c.mat as number]) === "") { auditar("ignorado", "LINHA_VAZIA"); return false; }
       st.linhas++;
       if (!/\bparcelas?\b/i.test(tipo)) {
         st.outrasFaturas++;
+        auditar("ignorado", "OUTRO_TIPO_FATURA");
         return false;
       }
       if (!/^\s*quitad/i.test(f[c.situacao as number] ?? "")) {
         st.naoQuitadas++;
+        auditar("ignorado", "PARCELA_NAO_QUITADA");
         return false;
       }
       const mat = matriculaTexto(f[c.mat as number]);
       if (!mat) {
         st.semMatricula++;
+        auditar("ignorado", "SEM_MATRICULA");
         return false;
       }
       const p = parseDateText(f[c.data as number] ?? "");
       if (!p) {
         st.semData++;
+        auditar("ignorado", "SEM_DATA_OU_DATA_INVALIDA");
         return false;
       }
       const v = parseValor(f[c.valor as number] ?? "", 0);
       if (v === null || Number.isNaN(v)) {
         st.valorInvalido++;
+        auditar("ignorado", "VALOR_PAGO_INVALIDO");
         return false;
       }
       const data = isoDate(p);
@@ -215,6 +228,7 @@ export async function lerArrecadacao(file: ArquivoLido, opts: OpcoesCsv = {}): P
       if (data > st.ultima) st.ultima = data;
       const ref = trimStr(c.venc === undefined ? "" : f[c.venc]) + "|" + trimStr(c.nota === undefined ? "" : f[c.nota]);
       pagamentos.push([mat, data, paraFixo(v), ref]);
+      auditar("aceito", "", pagamentos.length - 1);
       return false;
     },
     opts.onProgress ? (fr) => opts.onProgress?.({ phase: "Lendo arrecadação", fraction: fr }) : undefined

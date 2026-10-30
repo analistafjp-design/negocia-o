@@ -541,7 +541,7 @@ function colFromRef(ref: string): number {
  * Percorre a aba emitindo onRow(n, cols, vals, kinds) por linha (arrays reutilizados).
  * kinds: 0 texto, 1 número cru (texto original de <v>), 2 número com formato de data (já ISO).
  */
-export type AoLerLinha = (n: number, cols: number[], vals: string[], kinds: TipoCelula[]) => boolean | void;
+export type AoLerLinha = (n: number, cols: number[], vals: string[], kinds: TipoCelula[], linha: number) => boolean | void;
 
 export async function scanSheet(
   wb: Planilha,
@@ -555,7 +555,7 @@ export async function scanSheet(
   if (!entry) throw new NegError('MISSING_PART', `A aba "${sheet.name}" aponta para uma parte inexistente no arquivo.`);
   const { sst, dateStyle, date1904 } = ctx;
   const cols: number[] = [], vals: string[] = [], kinds: TipoCelula[] = [];
-  let n = 0, nextCol = 0;
+  let n = 0, nextCol = 0, linha = 0;
   let cCol = 0, cType = 'n', cStyle = 0;
   let inV = false, inT = false, inIs = false, inRPh = false;
   let vAcc = '', tAcc = '';
@@ -608,7 +608,12 @@ export async function scanSheet(
         case 'is': inIs = true; tAcc = ''; break;
         case 't': if (inIs && !inRPh) inT = true; break;
         case 'rPh': inRPh = true; break;
-        case 'row': n = 0; nextCol = 0; break;
+        case 'row': {
+          n = 0; nextCol = 0;
+          const r = Number(getAttr(inner, 'r'));
+          linha = Number.isSafeInteger(r) && r > 0 ? r : linha + 1;
+          break;
+        }
       }
     },
     close(name) {
@@ -619,7 +624,7 @@ export async function scanSheet(
         case 'is': inIs = false; break;
         case 'c': finishCell(); break;
         case 'row':
-          if (n > 0 && !stopped && onRow(n, cols, vals, kinds) === true) stopped = true;
+          if (n > 0 && !stopped && onRow(n, cols, vals, kinds, linha) === true) stopped = true;
           n = 0;
           break;
       }

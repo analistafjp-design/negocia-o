@@ -7,6 +7,9 @@ planilhas direto da pasta, no navegador. Nenhum dado sai do computador.
 Mesma base técnica do Painel Executivo: **TypeScript, Next.js (export estático), React, Tailwind, shadcn/ui e
 Recharts**. A cor é o azul do painel Cadastro e Venda (`#364dd4`, cabeçalho azul-marinho), definida nos tokens `--marca*` de `app/globals.css`.
 
+O [piloto de importação local](piloto/IMPORTADOR.md) registra origem e snapshots para comparar com a
+referência sintética, com [casos de erro para revisão](piloto/CASOS-DE-ERRO.md).
+
 ## O que a tela mostra
 
 | Bloco | Conteúdo |

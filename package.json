@@ -17,8 +17,10 @@
     "typecheck": "tsc --noEmit",
     "fixtures": "python3 tools/make_fixtures.py tests/fixtures",
     "test:core": "node --test tests/core.test.mjs",
+    "test:piloto": "node --test tests/piloto.test.mjs",
+    "importar:piloto": "node tools/importar-piloto.mjs",
     "test:ui": "node --test tests/ui.test.mjs",
-    "test": "npm run fixtures && npm run test:core && npm run build && npm run test:ui"
+    "test": "npm run fixtures && npm run test:core && npm run test:piloto && npm run build && npm run test:ui"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
